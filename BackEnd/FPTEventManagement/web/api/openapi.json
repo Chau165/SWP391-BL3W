@@ -1,0 +1,1269 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "FPT Event Management API",
+    "description": "API cho hệ thống quản lý sự kiện trong trường FPT do CLB hoặc Phòng ban tổ chức (workshop, talkshow): đăng ký, xuất vé QR, check-in.\n\n## Features\n- **CRUD sự kiện** - Tạo, sửa, xóa sự kiện\n- **Đăng ký + vé QR** - Sinh mã QR cho vé tham dự\n- **Check-in** - Quét QR code để check-in\n- **Quản lý seat** - Quản lý chỗ ngồi sự kiện\n- **Báo cáo** - Thống kê số người tham dự\n\n## User Roles\n- **Student** - Sinh viên đăng ký sự kiện\n- **Event Organizer** - CLB/Phòng ban tổ chức sự kiện\n- **Staff** - Nhân viên quản lý hệ thống",
+    "version": "1.0.0",
+    "contact": {
+      "name": "FPT Event Management Team",
+      "email": "support@fptevent.edu.vn"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:8080/FPTEventManagement",
+      "description": "Local Development Server"
+    }
+  ],
+  "tags": [
+    {
+      "name": "Guest",
+      "description": "API cho người dùng chưa đăng nhập"
+    },
+    {
+      "name": "Student",
+      "description": "API cho sinh viên đã đăng nhập"
+    },
+    {
+      "name": "Event Organizer",
+      "description": "API cho người tổ chức sự kiện"
+    },
+    {
+      "name": "Staff",
+      "description": "API cho nhân viên quản trị"
+    }
+  ],
+  "paths": {
+    "/api/login": {
+      "post": {
+        "tags": ["Guest"],
+        "summary": "[Guest] Đăng nhập hệ thống",
+        "description": "Đăng nhập với email và mật khẩu, trả về JWT token",
+        "operationId": "login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LoginRequest"
+              },
+              "examples": {
+                "student": {
+                  "summary": "Đăng nhập sinh viên",
+                  "value": {
+                    "email": "student@fpt.edu.vn",
+                    "password": "password123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đăng nhập thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/LoginResponse"
+                },
+                "examples": {
+                  "success": {
+                    "summary": "Login thành công",
+                    "value": {
+                      "status": "success",
+                      "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+                      "user": {
+                        "id": 1,
+                        "fullName": "Nguyễn Văn A",
+                        "email": "student@fpt.edu.vn",
+                        "role": "Student",
+                        "status": "ACTIVE"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Thiếu thông tin",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Email hoặc mật khẩu không đúng",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Tài khoản bị khóa",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorResponse"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/register/send-otp": {
+      "post": {
+        "tags": ["Guest"],
+        "summary": "[Guest] Đăng ký tài khoản - Bước 1: Gửi OTP",
+        "description": "Gửi mã OTP qua email để xác thực đăng ký tài khoản mới",
+        "operationId": "registerSendOtp",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gửi OTP thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "otp_sent"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "OTP has been sent to your email"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Dữ liệu không hợp lệ"
+          },
+          "409": {
+            "description": "Email đã tồn tại"
+          }
+        }
+      }
+    },
+    "/api/register/resend-otp": {
+      "post": {
+        "tags": ["Guest"],
+        "summary": "[Guest] Đăng ký - Gửi lại OTP",
+        "description": "Gửi lại mã OTP nếu chưa nhận được hoặc đã hết hạn",
+        "operationId": "registerResendOtp",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "student@fpt.edu.vn"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gửi lại OTP thành công"
+          },
+          "400": {
+            "description": "Không có phiên đăng ký"
+          },
+          "429": {
+            "description": "Quá nhiều yêu cầu, vui lòng đợi"
+          }
+        }
+      }
+    },
+    "/api/register/verify-otp": {
+      "post": {
+        "tags": ["Guest"],
+        "summary": "[Guest] Đăng ký - Bước 2: Xác thực OTP & Tạo tài khoản",
+        "description": "Xác thực mã OTP và tạo tài khoản mới, trả về JWT token",
+        "operationId": "registerVerifyOtp",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email", "otp"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "student@fpt.edu.vn"
+                  },
+                  "otp": {
+                    "type": "string",
+                    "pattern": "^[0-9]{6}$",
+                    "example": "123456"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đăng ký thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Registered and logged in successfully"
+                    },
+                    "token": {
+                      "type": "string"
+                    },
+                    "user": {
+                      "$ref": "#/components/schemas/User"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "OTP không đúng hoặc hết hạn"
+          },
+          "409": {
+            "description": "Email đã tồn tại"
+          },
+          "429": {
+            "description": "Quá nhiều lần thử, vui lòng yêu cầu OTP mới"
+          }
+        }
+      }
+    },
+    "/api/forgot-password": {
+      "post": {
+        "tags": ["Guest"],
+        "summary": "[Guest] Quên mật khẩu - Gửi OTP",
+        "description": "Gửi email chứa OTP và link đặt lại mật khẩu",
+        "operationId": "forgotPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["email"],
+                "properties": {
+                  "email": {
+                    "type": "string",
+                    "format": "email",
+                    "example": "student@fpt.edu.vn"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Gửi email thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Đã gửi OTP và link đặt lại mật khẩu tới email"
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Email không hợp lệ"
+          },
+          "404": {
+            "description": "Email không tồn tại trong hệ thống"
+          },
+          "500": {
+            "description": "Không thể gửi email"
+          }
+        }
+      }
+    },
+    "/api/reset-password": {
+      "post": {
+        "tags": ["Guest"],
+        "summary": "[Guest] Đặt lại mật khẩu với OTP",
+        "description": "Đặt lại mật khẩu mới với JWT token và OTP từ email",
+        "operationId": "resetPassword",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["token", "otp", "newPassword"],
+                "properties": {
+                  "token": {
+                    "type": "string",
+                    "description": "JWT token từ email"
+                  },
+                  "otp": {
+                    "type": "string",
+                    "pattern": "^[0-9]{6}$",
+                    "example": "123456"
+                  },
+                  "newPassword": {
+                    "type": "string",
+                    "minLength": 6,
+                    "example": "newpassword123"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Đổi mật khẩu thành công"
+          },
+          "400": {
+            "description": "Thiếu thông tin hoặc mật khẩu quá ngắn"
+          },
+          "401": {
+            "description": "Token hoặc OTP không hợp lệ"
+          },
+          "500": {
+            "description": "Không thể cập nhật mật khẩu"
+          }
+        }
+      }
+    },
+    "/api/events": {
+      "get": {
+        "tags": ["Student"],
+        "summary": "[Student] Xem danh sách sự kiện",
+        "description": "Lấy danh sách các sự kiện (workshop, talkshow) đang mở đăng ký",
+        "operationId": "getEvents",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "description": "Lọc theo trạng thái sự kiện",
+            "schema": {
+              "type": "string",
+              "enum": ["UPCOMING", "ONGOING", "COMPLETED"],
+              "example": "UPCOMING"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách sự kiện",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "eventId": {
+                        "type": "integer",
+                        "example": 1
+                      },
+                      "eventName": {
+                        "type": "string",
+                        "example": "Workshop AI & Machine Learning"
+                      },
+                      "eventType": {
+                        "type": "string",
+                        "enum": ["WORKSHOP", "TALKSHOW"],
+                        "example": "WORKSHOP"
+                      },
+                      "organizer": {
+                        "type": "string",
+                        "example": "CLB AI FPT"
+                      },
+                      "venue": {
+                        "type": "string",
+                        "example": "Hội trường A"
+                      },
+                      "startTime": {
+                        "type": "string",
+                        "format": "date-time",
+                        "example": "2025-12-15T14:00:00"
+                      },
+                      "endTime": {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      "totalSeats": {
+                        "type": "integer",
+                        "example": 200
+                      },
+                      "availableSeats": {
+                        "type": "integer",
+                        "example": 150
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": ["UPCOMING", "ONGOING", "COMPLETED", "CANCELLED"],
+                        "example": "UPCOMING"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Chưa đăng nhập"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Event Organizer"],
+        "summary": "[Event Organizer] Tạo sự kiện mới",
+        "description": "Tạo workshop hoặc talkshow mới (CRUD Event - Setup 1)",
+        "operationId": "createEvent",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["eventName", "eventType", "venueId", "startTime", "endTime", "totalSeats"],
+                "properties": {
+                  "eventName": {
+                    "type": "string",
+                    "example": "Workshop AI & Machine Learning"
+                  },
+                  "eventType": {
+                    "type": "string",
+                    "enum": ["WORKSHOP", "TALKSHOW"],
+                    "example": "WORKSHOP"
+                  },
+                  "description": {
+                    "type": "string",
+                    "example": "Học về AI cơ bản đến nâng cao"
+                  },
+                  "venueId": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "speakerId": {
+                    "type": "integer",
+                    "example": 1
+                  },
+                  "startTime": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2025-12-15T14:00:00"
+                  },
+                  "endTime": {
+                    "type": "string",
+                    "format": "date-time",
+                    "example": "2025-12-15T17:00:00"
+                  },
+                  "totalSeats": {
+                    "type": "integer",
+                    "example": 200
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Tạo sự kiện thành công"
+          },
+          "400": {
+            "description": "Dữ liệu không hợp lệ"
+          },
+          "401": {
+            "description": "Chưa đăng nhập"
+          },
+          "403": {
+            "description": "Không có quyền (phải là Event Organizer)"
+          }
+        }
+      }
+    },
+    "/api/events/{eventId}": {
+      "get": {
+        "tags": ["Student"],
+        "summary": "[Student] Xem chi tiết sự kiện",
+        "description": "Xem thông tin chi tiết sự kiện, speaker, venue",
+        "operationId": "getEventDetail",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "example": 1
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Chi tiết sự kiện"
+          },
+          "404": {
+            "description": "Không tìm thấy sự kiện"
+          }
+        }
+      },
+      "put": {
+        "tags": ["Event Organizer"],
+        "summary": "[Event Organizer] Cập nhật sự kiện",
+        "description": "Sửa thông tin sự kiện (CRUD Event)",
+        "operationId": "updateEvent",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "eventName": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "totalSeats": {
+                    "type": "integer"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Cập nhật thành công"
+          },
+          "403": {
+            "description": "Không có quyền"
+          },
+          "404": {
+            "description": "Không tìm thấy"
+          }
+        }
+      },
+      "delete": {
+        "tags": ["Event Organizer"],
+        "summary": "[Event Organizer] Xóa sự kiện",
+        "description": "Hủy/Xóa sự kiện (CRUD Event)",
+        "operationId": "deleteEvent",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Xóa thành công"
+          },
+          "403": {
+            "description": "Không có quyền"
+          },
+          "404": {
+            "description": "Không tìm thấy"
+          }
+        }
+      }
+    },
+    "/api/registrations": {
+      "post": {
+        "tags": ["Student"],
+        "summary": "[Student] Đăng ký tham dự sự kiện",
+        "description": "Đăng ký sự kiện và nhận vé QR (Processing 1: Đăng ký – phát vé QR)",
+        "operationId": "registerEvent",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["eventId"],
+                "properties": {
+                  "eventId": {
+                    "type": "integer",
+                    "example": 1
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Đăng ký thành công, trả về vé QR",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Đăng ký thành công"
+                    },
+                    "ticket": {
+                      "type": "object",
+                      "properties": {
+                        "ticketId": {
+                          "type": "integer",
+                          "example": 1
+                        },
+                        "qrCode": {
+                          "type": "string",
+                          "description": "Base64 image của QR code",
+                          "example": "data:image/png;base64,iVBORw0KGgoAAAANS..."
+                        },
+                        "ticketCode": {
+                          "type": "string",
+                          "example": "EVT001-USR123-20251215"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "Đã đăng ký rồi hoặc dữ liệu không hợp lệ"
+          },
+          "404": {
+            "description": "Không tìm thấy sự kiện"
+          },
+          "409": {
+            "description": "Hết chỗ (Processing 2: Xử lý chỗ hết)"
+          }
+        }
+      }
+    },
+    "/api/registrations/my-tickets": {
+      "get": {
+        "tags": ["Student"],
+        "summary": "[Student] Xem vé của tôi",
+        "description": "Xem danh sách vé đã đăng ký",
+        "operationId": "getMyTickets",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách vé",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ticketId": {
+                        "type": "integer",
+                        "example": 1
+                      },
+                      "eventName": {
+                        "type": "string",
+                        "example": "Workshop AI"
+                      },
+                      "ticketCode": {
+                        "type": "string",
+                        "example": "EVT001-USR123-20251215"
+                      },
+                      "qrCode": {
+                        "type": "string",
+                        "example": "data:image/png;base64,..."
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": ["VALID", "CHECKED_IN", "CANCELLED"],
+                        "example": "VALID"
+                      },
+                      "checkedInAt": {
+                        "type": "string",
+                        "format": "date-time",
+                        "nullable": true
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/registrations/{ticketId}/cancel": {
+      "post": {
+        "tags": ["Student"],
+        "summary": "[Student] Hủy vé",
+        "description": "Hủy đăng ký tham dự (Processing 2: Xử lý hủy vé)",
+        "operationId": "cancelTicket",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "ticketId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Hủy vé thành công"
+          },
+          "400": {
+            "description": "Không thể hủy (đã check-in hoặc quá thời hạn)"
+          }
+        }
+      }
+    },
+    "/api/checkin": {
+      "post": {
+        "tags": ["Staff"],
+        "summary": "[Staff] Check-in bằng QR code",
+        "description": "Quét QR code để check-in (Processing 1: check-in, Exception: QR invalid)",
+        "operationId": "checkinEvent",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["ticketCode"],
+                "properties": {
+                  "ticketCode": {
+                    "type": "string",
+                    "description": "Mã vé từ QR code",
+                    "example": "EVT001-USR123-20251215"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Check-in thành công",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "type": "string",
+                      "example": "success"
+                    },
+                    "message": {
+                      "type": "string",
+                      "example": "Check-in thành công"
+                    },
+                    "attendee": {
+                      "type": "object",
+                      "properties": {
+                        "fullName": {
+                          "type": "string",
+                          "example": "Nguyễn Văn A"
+                        },
+                        "email": {
+                          "type": "string",
+                          "example": "student@fpt.edu.vn"
+                        },
+                        "eventName": {
+                          "type": "string",
+                          "example": "Workshop AI"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "QR code không hợp lệ (Exception: QR invalid)"
+          },
+          "404": {
+            "description": "Không tìm thấy vé"
+          },
+          "409": {
+            "description": "Vé đã được check-in rồi (Exception: vé trùng)"
+          }
+        }
+      }
+    },
+    "/api/events/{eventId}/attendees": {
+      "get": {
+        "tags": ["Event Organizer"],
+        "summary": "[Event Organizer] Báo cáo người tham dự",
+        "description": "Xem danh sách và thống kê người tham dự (Report: Thống kê số người tham dự)",
+        "operationId": "getAttendees",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "eventId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Báo cáo người tham dự",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "eventName": {
+                      "type": "string",
+                      "example": "Workshop AI"
+                    },
+                    "totalRegistered": {
+                      "type": "integer",
+                      "example": 180
+                    },
+                    "totalCheckedIn": {
+                      "type": "integer",
+                      "example": 150
+                    },
+                    "totalCancelled": {
+                      "type": "integer",
+                      "example": 20
+                    },
+                    "attendees": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "fullName": {
+                            "type": "string"
+                          },
+                          "email": {
+                            "type": "string"
+                          },
+                          "registeredAt": {
+                            "type": "string",
+                            "format": "date-time"
+                          },
+                          "checkedInAt": {
+                            "type": "string",
+                            "format": "date-time",
+                            "nullable": true
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": ["REGISTERED", "CHECKED_IN", "CANCELLED"]
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Không có quyền"
+          }
+        }
+      }
+    },
+    "/api/speakers": {
+      "get": {
+        "tags": ["Event Organizer"],
+        "summary": "[Event Organizer] Danh sách speaker",
+        "description": "Xem danh sách diễn giả (Setup 2: CRUD Speaker)",
+        "operationId": "getSpeakers",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách speaker"
+          }
+        }
+      },
+      "post": {
+        "tags": ["Event Organizer"],
+        "summary": "[Event Organizer] Thêm speaker",
+        "description": "Thêm diễn giả mới (Setup 2: CRUD Speaker)",
+        "operationId": "createSpeaker",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["speakerName", "bio"],
+                "properties": {
+                  "speakerName": {
+                    "type": "string",
+                    "example": "TS. Nguyễn Văn A"
+                  },
+                  "bio": {
+                    "type": "string",
+                    "example": "Chuyên gia AI, 10 năm kinh nghiệm"
+                  },
+                  "expertise": {
+                    "type": "string",
+                    "example": "AI, Machine Learning"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Thêm speaker thành công"
+          }
+        }
+      }
+    },
+    "/api/venues": {
+      "get": {
+        "tags": ["Event Organizer"],
+        "summary": "[Event Organizer] Danh sách địa điểm",
+        "description": "Xem danh sách venue (Setup 2: CRUD Venue)",
+        "operationId": "getVenues",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Danh sách venue",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "venueId": {
+                        "type": "integer",
+                        "example": 1
+                      },
+                      "venueName": {
+                        "type": "string",
+                        "example": "Hội trường A"
+                      },
+                      "capacity": {
+                        "type": "integer",
+                        "example": 300
+                      },
+                      "location": {
+                        "type": "string",
+                        "example": "Tòa nhà Alpha"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "post": {
+        "tags": ["Event Organizer"],
+        "summary": "[Event Organizer] Thêm địa điểm",
+        "description": "Thêm venue mới (Setup 2: CRUD Venue)",
+        "operationId": "createVenue",
+        "security": [
+          {
+            "BearerAuth": []
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "required": ["venueName", "capacity", "location"],
+                "properties": {
+                  "venueName": {
+                    "type": "string",
+                    "example": "Hội trường A"
+                  },
+                  "capacity": {
+                    "type": "integer",
+                    "example": 300
+                  },
+                  "location": {
+                    "type": "string",
+                    "example": "Tòa nhà Alpha"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Thêm venue thành công"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "LoginRequest": {
+        "type": "object",
+        "required": ["email", "password"],
+        "properties": {
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email đăng nhập",
+            "example": "student@fpt.edu.vn"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "description": "Mật khẩu",
+            "example": "password123"
+          }
+        }
+      },
+      "LoginResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["success"],
+            "example": "success"
+          },
+          "token": {
+            "type": "string",
+            "description": "JWT access token",
+            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+          },
+          "user": {
+            "$ref": "#/components/schemas/User"
+          }
+        }
+      },
+      "RegisterRequest": {
+        "type": "object",
+        "required": ["fullName", "phone", "email", "password"],
+        "properties": {
+          "fullName": {
+            "type": "string",
+            "description": "Họ và tên",
+            "example": "Nguyễn Văn A"
+          },
+          "phone": {
+            "type": "string",
+            "pattern": "^0[0-9]{9,10}$",
+            "description": "Số điện thoại",
+            "example": "0912345678"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "description": "Email",
+            "example": "student@fpt.edu.vn"
+          },
+          "password": {
+            "type": "string",
+            "format": "password",
+            "minLength": 6,
+            "description": "Mật khẩu (tối thiểu 6 ký tự)",
+            "example": "password123"
+          }
+        }
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "integer",
+            "example": 1
+          },
+          "fullName": {
+            "type": "string",
+            "example": "Nguyễn Văn A"
+          },
+          "email": {
+            "type": "string",
+            "format": "email",
+            "example": "student@fpt.edu.vn"
+          },
+          "phone": {
+            "type": "string",
+            "example": "0912345678"
+          },
+          "role": {
+            "type": "string",
+            "enum": ["Student", "Event Organizer", "Staff"],
+            "description": "Vai trò người dùng",
+            "example": "Student"
+          },
+          "status": {
+            "type": "string",
+            "enum": ["ACTIVE", "INACTIVE", "BLOCKED"],
+            "description": "Trạng thái tài khoản",
+            "example": "ACTIVE"
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "ErrorResponse": {
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": ["fail", "error"],
+            "example": "fail"
+          },
+          "code": {
+            "type": "string",
+            "description": "Mã lỗi",
+            "example": "AUTH_INVALID"
+          },
+          "message": {
+            "type": "string",
+            "description": "Mô tả lỗi",
+            "example": "Email hoặc mật khẩu không hợp lệ"
+          }
+        }
+      }
+    },
+    "securitySchemes": {
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT",
+        "description": "JWT token được trả về từ API login. Nhập vào ô bên dưới với format: `Bearer {token}`"
+      }
+    }
+  },
+  "security": []
+}

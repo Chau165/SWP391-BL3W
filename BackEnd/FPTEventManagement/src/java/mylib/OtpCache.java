@@ -25,10 +25,15 @@ public class OtpCache {
             u.setFullName(fullName);
             u.setPhone(phone);
             u.setEmail(email);
-            u.setPassword(password); // Hash ở DAO nếu bạn đã làm
-            u.setRole("Driver");
-            u.setStationId(null);
+            // passwordHash sẽ được set ở DAO khi insert
+            u.setRole("Student"); // Default role for event registration
+            u.setStatus("ACTIVE");
             return u;
+        }
+        
+        // Helper để lấy raw password cho DAO
+        public String getRawPassword() {
+            return password;
         }
     }
 

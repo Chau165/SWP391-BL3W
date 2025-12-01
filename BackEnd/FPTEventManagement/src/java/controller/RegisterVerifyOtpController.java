@@ -10,6 +10,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.*;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 @WebServlet("/api/register/verify-otp")
 public class RegisterVerifyOtpController extends HttpServlet {
@@ -82,7 +84,8 @@ public class RegisterVerifyOtpController extends HttpServlet {
             }
 
             Users newUserEntity = p.toUsersEntity();
-            int newId = dao.insertUser(newUserEntity);
+            String rawPassword = p.getRawPassword();
+            int newId = dao.insertUser(newUserEntity, rawPassword);
             if (newId <= 0) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Failed to create user\"}");
@@ -108,6 +111,8 @@ public class RegisterVerifyOtpController extends HttpServlet {
                     + "\"token\":\"" + token + "\","
                     + "\"user\":" + gson.toJson(newUser)
                     + "}");
+        } catch (Exception ex) {
+            Logger.getLogger(RegisterVerifyOtpController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 
