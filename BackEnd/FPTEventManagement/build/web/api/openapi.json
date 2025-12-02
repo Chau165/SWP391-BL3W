@@ -370,7 +370,7 @@
       "post": {
         "tags": ["Guest"],
         "summary": "[Guest] Đặt lại mật khẩu với OTP",
-        "description": "Đặt lại mật khẩu mới với JWT token và OTP từ email",
+        "description": "Đặt lại mật khẩu mới bằng OTP (chỉ cần otp + newPassword)",
         "operationId": "resetPassword",
         "requestBody": {
           "required": true,
@@ -378,12 +378,8 @@
             "application/json": {
               "schema": {
                 "type": "object",
-                "required": ["token", "otp", "newPassword"],
+                "required": ["otp", "newPassword"],
                 "properties": {
-                  "token": {
-                    "type": "string",
-                    "description": "JWT token từ email"
-                  },
                   "otp": {
                     "type": "string",
                     "pattern": "^[0-9]{6}$",
@@ -407,7 +403,7 @@
             "description": "Thiếu thông tin hoặc mật khẩu quá ngắn"
           },
           "401": {
-            "description": "Token hoặc OTP không hợp lệ"
+            "description": "OTP không hợp lệ"
           },
           "500": {
             "description": "Không thể cập nhật mật khẩu"
@@ -421,10 +417,8 @@
         "summary": "[Student] Xem danh sách sự kiện",
         "description": "Lấy danh sách các sự kiện (workshop, talkshow) đang mở đăng ký",
         "operationId": "getEvents",
-        "security": [
-          {
-            "BearerAuth": []
-          }
+        "security": []
+      }
         ],
         "parameters": [
           {

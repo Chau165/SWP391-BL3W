@@ -46,6 +46,29 @@ public class PasswordResetManager {
         return ok;
     }
 
+    /**
+     * Find and consume an OTP without requiring the email.
+     * Returns the associated email if OTP is valid and not expired/used, otherwise null.
+     */
+    public static String consumeOtp(String otp) {
+        if (otp == null) return null;
+        String o = otp.trim();
+        for (Map.Entry<String, Entry> kv : STORE.entrySet()) {
+            Entry e = kv.getValue();
+            if (e == null) continue;
+            if (e.used) continue;
+            if (Instant.now().isAfter(e.expiresAt)) continue;
+            if (e.attempts >= MAX_ATTEMPTS) continue;
+            // increment attempts for this try
+            e.attempts++;
+            if (Objects.equals(e.otp, o)) {
+                e.used = true;
+                return e.email;
+            }
+        }
+        return null;
+    }
+
     public static void invalidate(String email) {
         STORE.remove(email.toLowerCase());
     }

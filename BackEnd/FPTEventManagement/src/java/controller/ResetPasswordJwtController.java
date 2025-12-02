@@ -2,7 +2,7 @@ package controller;
 
 import DAO.UsersDAO;
 import com.google.gson.Gson;
-import utils.ResetJwtUtil;
+// no JWT reset decoding here anymore
 import utils.PasswordResetManager; // dùng OTP
 
 import jakarta.servlet.annotation.WebServlet;
@@ -11,7 +11,7 @@ import java.io.*;
 
 /**
  * POST /api/reset-password
- * Body: { token, otp, newPassword }
+ * Body: { email, otp, newPassword }
  */
 @WebServlet("/api/reset-password")
 public class ResetPasswordJwtController extends HttpServlet {
@@ -21,7 +21,6 @@ public class ResetPasswordJwtController extends HttpServlet {
 
     // ===== DTO request =====
     private static class Req {
-        String token;
         String otp;
         String newPassword;
     }
@@ -48,9 +47,9 @@ public class ResetPasswordJwtController extends HttpServlet {
         }
 
         Req body = gson.fromJson(sb.toString(), Req.class);
-        if (body == null || isBlank(body.token) || isBlank(body.otp) || isBlank(body.newPassword)) {
+        if (body == null || isBlank(body.otp) || isBlank(body.newPassword)) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            out.print("{\"status\":\"fail\",\"message\":\"Thiếu token/OTP/mật khẩu mới\"}");
+            out.print("{\"status\":\"fail\",\"message\":\"Thiếu OTP/mật khẩu mới\"}");
             return;
         }
 
@@ -61,18 +60,9 @@ public class ResetPasswordJwtController extends HttpServlet {
             return;
         }
 
-        // 1) Decode JWT reset
-        String email = ResetJwtUtil.getEmail(body.token);
-        Integer uid  = ResetJwtUtil.getUserId(body.token);
-        if (email == null || uid == null) {
-            response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            out.print("{\"status\":\"fail\",\"message\":\"Token không hợp lệ hoặc đã hết hạn\"}");
-            return;
-        }
-
-        // 2) Verify OTP theo email
-        boolean otpOk = PasswordResetManager.verifyOtp(email, body.otp.trim());
-        if (!otpOk) {
+        // Verify and consume OTP (we map OTP -> email internally)
+        String email = PasswordResetManager.consumeOtp(body.otp.trim());
+        if (email == null) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             out.print("{\"status\":\"fail\",\"message\":\"OTP không đúng hoặc đã hết hạn\"}");
             return;
