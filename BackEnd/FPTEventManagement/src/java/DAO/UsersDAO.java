@@ -7,6 +7,7 @@ import utils.PasswordUtils;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.Statement;
 
 public class UsersDAO {
@@ -16,14 +17,13 @@ public class UsersDAO {
             return null;
         }
 
-        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, created_at " +
-                     "FROM Users WHERE email = ?";
+        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, created_at "
+                + "FROM Users WHERE email = ?";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, email);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     String dbHash = rs.getString("password_hash");
 
@@ -42,7 +42,7 @@ public class UsersDAO {
                     user.setPasswordHash(dbHash); // nếu DTO có field này
                     user.setRole(rs.getString("role"));
                     user.setStatus(rs.getString("status"));
-                    user.setCreatedAt(rs.getTimestamp("created_at"));
+                    user.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
                     return user;
                 } else {
                     // Không tìm thấy email
@@ -56,147 +56,175 @@ public class UsersDAO {
         }
     }
 
-    // ========== THÊM CÁC METHOD CHO FORGOT PASSWORD & REGISTER ==========
+    // =========================
+    // TÌM USER THEO ID
+    // =========================
+    public Users findById(int id) {
+        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, created_at "
+                + "FROM Users WHERE user_id = ?";
 
-    /**
-     * Tìm user theo email (cho forgot password)
-     */
-    public Users getUserByEmail(String email) {
-        if (email == null) return null;
+        try ( Connection con = DBUtils.getConnection();  PreparedStatement ps = con.prepareStatement(sql)) {
 
-        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, created_at " +
-                     "FROM Users WHERE email = ?";
+            ps.setInt(1, id);
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            ps.setString(1, email);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
-                    Users user = new Users();
-                    user.setId(rs.getInt("user_id"));
-                    user.setFullName(rs.getString("full_name"));
-                    user.setEmail(rs.getString("email"));
-                    user.setPhone(rs.getString("phone"));
-                    user.setPasswordHash(rs.getString("password_hash"));
-                    user.setRole(rs.getString("role"));
-                    user.setStatus(rs.getString("status"));
-                    user.setCreatedAt(rs.getTimestamp("created_at"));
-                    return user;
+                    return mapRowToUser(rs);
                 }
             }
         } catch (Exception e) {
+            System.err.println("[ERROR] findById: " + e.getMessage());
             e.printStackTrace();
         }
         return null;
     }
 
-    /**
-     * Kiểm tra email đã tồn tại chưa (cho register)
-     */
-    public boolean existsByEmail(String email) throws Exception {
-        if (email == null) return false;
+    // =========================
+    // KIỂM TRA EMAIL TỒN TẠI
+    // =========================
+    public boolean existsByEmail(String email) {
+        String sql = "SELECT user_id FROM Users WHERE email = ?";
 
-        String sql = "SELECT COUNT(*) FROM Users WHERE email = ?";
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setString(1, email);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return rs.getInt(1) > 0;
-                }
+            ps.setNString(1, email); // email là NVARCHAR
+            try ( ResultSet rs = ps.executeQuery()) {
+                return rs.next();
             }
+        } catch (Exception e) {
+            System.err.println("[ERROR] existsByEmail: " + e.getMessage());
+            e.printStackTrace();
         }
         return false;
     }
 
+    // =========================
+    // TẠO USER MỚI
+    // =========================
     /**
-     * Insert user mới (cho register), trả về user_id
-     * @param user Users entity with basic info
-     * @param rawPassword Raw password (unhashed) to be hashed before insert
+     * insertUser: nhận vào Users đã có passwordHash (đã hash trước khi
+     * gọi).Role & Status nếu null sẽ set default: - role : STUDENT - status:
+     * ACTIVE
+     *
+     * @param u
+     * @return
      */
-    public int insertUser(Users user, String rawPassword) {
-        if (user == null || user.getEmail() == null || rawPassword == null) return -1;
+    public int insertUser(Users u) {
+        String sql = "INSERT INTO Users(full_name, email, phone, password_hash, role, status) "
+                + "VALUES (?, ?, ?, ?, ?, ?)";
 
-        String sql = "INSERT INTO Users (full_name, email, phone, password_hash, role, status) " +
-                     "VALUES (?, ?, ?, ?, ?, ?)";
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+            ps.setNString(1, u.getFullName());
+            ps.setNString(2, u.getEmail());
+            ps.setNString(3, u.getPhone());
 
-            // Hash password trước khi lưu
-            String hashedPassword = PasswordUtils.hashPassword(rawPassword);
+            // password_hash: phải là hash SHA-256
+            ps.setString(4, u.getPasswordHash());
 
-            ps.setString(1, user.getFullName());
-            ps.setString(2, user.getEmail());
-            ps.setString(3, user.getPhone());
-            ps.setString(4, hashedPassword);
-            ps.setString(5, user.getRole() != null ? user.getRole() : "Student");
-            ps.setString(6, user.getStatus() != null ? user.getStatus() : "ACTIVE");
+            String role = isBlank(u.getRole()) ? "STUDENT" : u.getRole();
+            String status = isBlank(u.getStatus()) ? "ACTIVE" : u.getStatus();
 
-            int affected = ps.executeUpdate();
-            if (affected > 0) {
-                try (ResultSet rs = ps.getGeneratedKeys()) {
-                    if (rs.next()) {
-                        return rs.getInt(1);
-                    }
+            ps.setNString(5, role);
+            ps.setNString(6, status);
+
+            ps.executeUpdate();
+
+            try ( ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) {
+                    return rs.getInt(1); // user_id mới
                 }
             }
+
         } catch (Exception e) {
+            System.err.println("[ERROR] insertUser: " + e.getMessage());
             e.printStackTrace();
         }
         return -1;
     }
 
     /**
-     * Tìm user theo ID (sau khi insert)
+     * Cập nhật mật khẩu (hash) theo email.
+     *
+     * @param email email user
+     * @param rawPassword mật khẩu mới dạng plain-text
+     * @return 
      */
-    public Users findById(int userId) {
-        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, created_at " +
-                     "FROM Users WHERE user_id = ?";
-
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            ps.setInt(1, userId);
-            try (ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    Users user = new Users();
-                    user.setId(rs.getInt("user_id"));
-                    user.setFullName(rs.getString("full_name"));
-                    user.setEmail(rs.getString("email"));
-                    user.setPhone(rs.getString("phone"));
-                    user.setPasswordHash(rs.getString("password_hash"));
-                    user.setRole(rs.getString("role"));
-                    user.setStatus(rs.getString("status"));
-                    user.setCreatedAt(rs.getTimestamp("created_at"));
-                    return user;
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
+    public boolean updatePasswordByEmail(String email, String rawPassword) {
+        if (email == null || rawPassword == null) {
+            return false;
         }
-        return null;
-    }
-
-    /**
-     * Cập nhật password theo email (cho reset password)
-     */
-    public boolean updatePasswordByEmail(String email, String newPassword) throws Exception {
-        if (email == null || newPassword == null) return false;
 
         String sql = "UPDATE Users SET password_hash = ? WHERE email = ?";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            String hashedPassword = PasswordUtils.hashPassword(newPassword);
-            ps.setString(1, hashedPassword);
-            ps.setString(2, email);
+            String hash = PasswordUtils.hashPassword(rawPassword);
+            ps.setString(1, hash);
+            ps.setNString(2, email);
 
-            int affected = ps.executeUpdate();
-            return affected > 0;
+            int rows = ps.executeUpdate();
+            return rows > 0;
+
+        } catch (Exception e) {
+            System.err.println("[ERROR] updatePasswordByEmail: " + e.getMessage());
+            e.printStackTrace();
         }
+        return false;
     }
+    
+    
+    public Users getUserByEmail(String email) {
+    Users user = null;
+
+    String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, created_at "
+               + "FROM Users WHERE email = ?";
+
+    try (Connection conn = DBUtils.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
+
+        ps.setNString(1, email);  // Email là NVARCHAR
+
+        try (ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                user = new Users();
+                user.setId(rs.getInt("user_id"));
+                user.setFullName(rs.getNString("full_name"));
+                user.setEmail(rs.getNString("email"));
+                user.setPhone(rs.getString("phone"));
+                user.setPasswordHash(rs.getString("password_hash"));
+                user.setRole(rs.getString("role"));
+                user.setStatus(rs.getString("status"));
+                user.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+            }
+        }
+
+    } catch (Exception e) {
+        System.err.println("[ERROR] getUserByEmail: " + e.getMessage());
+        e.printStackTrace();
+    }
+
+    return user;
+}
+
+    // =========================
+    // HELPER: MAP 1 ROW -> Users DTO
+    // =========================
+    private Users mapRowToUser(ResultSet rs) throws SQLException {
+        Users u = new Users();
+        u.setId(rs.getInt("user_id"));
+        u.setFullName(rs.getNString("full_name"));
+        u.setEmail(rs.getNString("email"));
+        u.setPhone(rs.getNString("phone"));
+        u.setPasswordHash(rs.getString("password_hash"));
+        u.setRole(rs.getNString("role"));
+        u.setStatus(rs.getNString("status"));
+        u.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
+        return u;
+    }
+
+    private boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
+    }
+
 }

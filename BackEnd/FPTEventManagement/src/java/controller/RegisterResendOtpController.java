@@ -42,7 +42,6 @@ public class RegisterResendOtpController extends HttpServlet {
 
             OtpCache.PendingUser p = OtpCache.get(input.email);
             if (p == null) {
-                // Không có phiên đăng ký pending cho email này
                 resp.setStatus(400);
                 out.print("{\"error\":\"No pending registration for this email. Please submit information again.\"}");
                 return;
@@ -55,7 +54,6 @@ public class RegisterResendOtpController extends HttpServlet {
             }
 
             String newOtp = EmailService.generateOtp();
-            // Gửi email trước, nếu gửi OK mới commit thay đổi OTP trong cache
             boolean sent = EmailService.sendRegistrationOtpEmail(input.email, newOtp);
             if (!sent) {
                 resp.setStatus(502);
@@ -63,7 +61,6 @@ public class RegisterResendOtpController extends HttpServlet {
                 return;
             }
 
-            // Cập nhật cache với OTP mới và gia hạn
             OtpCache.applyResend(input.email, newOtp);
 
             out.print("{\"status\":\"otp_resent\",\"message\":\"OTP has been resent to your email\"}");

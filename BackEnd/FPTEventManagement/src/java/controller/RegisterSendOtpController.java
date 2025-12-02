@@ -4,6 +4,7 @@ import DAO.UsersDAO;
 import com.google.gson.Gson;
 import mylib.EmailService;
 import mylib.OtpCache;
+import mylib.ValidationUtil;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -15,14 +16,6 @@ public class RegisterSendOtpController extends HttpServlet {
 
     private final Gson gson = new Gson();
 
-    // ================= OPTIONS =================
-    @Override
-    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
-        setCorsHeaders(resp, req);
-        resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
-    }
-
-    // ================= DTO REQUEST =================
     static class RegisterRequest {
         String fullName;
         String phone;
@@ -30,75 +23,69 @@ public class RegisterSendOtpController extends HttpServlet {
         String password;
     }
 
-    // ================= POST =================
+    @Override
+    protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        setCorsHeaders(resp, req);
+        resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
+    }
+
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
         setCorsHeaders(resp, req);
         resp.setContentType("application/json;charset=UTF-8");
-
-        // === DEBUG: log thông tin context & URL ===
-        String baseUrl = req.getScheme() + "://" + req.getServerName()
-                + ((req.getServerPort() == 80 || req.getServerPort() == 443) ? "" : ":" + req.getServerPort())
-                + req.getContextPath();
-        System.out.println("=== [RegisterSendOtpController] ===");
-        System.out.println("Request URL: " + baseUrl + req.getServletPath());
+        req.setCharacterEncoding("UTF-8");
 
         try (BufferedReader reader = req.getReader(); PrintWriter out = resp.getWriter()) {
 
-            // === Đọc raw body để debug ===
-            StringBuilder raw = new StringBuilder();
-            String line;
-            while ((line = reader.readLine()) != null) raw.append(line);
-            System.out.println("[send-otp] Raw JSON body: " + raw);
-
-            // === Parse JSON ===
-            RegisterRequest input = gson.fromJson(raw.toString(), RegisterRequest.class);
-            if (input == null || input.email == null || input.password == null) {
+            RegisterRequest input = gson.fromJson(reader, RegisterRequest.class);
+            if (input == null) {
                 resp.setStatus(400);
-                out.print("{\"error\":\"Invalid input or missing email/password\"}");
-                System.out.println("[send-otp] ❌ Invalid input");
+                out.print("{\"error\":\"Invalid input\"}");
                 return;
             }
 
-            System.out.println("[send-otp] Parsed: fullName=" + input.fullName
-                    + ", phone=" + input.phone + ", email=" + input.email);
+            // Validate
+            if (!ValidationUtil.isValidFullName(input.fullName)) {
+                resp.setStatus(400);
+                out.print("{\"error\":\"Full name is invalid\"}");
+                return;
+            }
+            if (!ValidationUtil.isValidVNPhone(input.phone)) {
+                resp.setStatus(400);
+                out.print("{\"error\":\"Phone number is invalid\"}");
+                return;
+            }
+            if (!ValidationUtil.isValidEmail(input.email)) {
+                resp.setStatus(400);
+                out.print("{\"error\":\"Email is invalid\"}");
+                return;
+            }
+            if (!ValidationUtil.isValidPassword(input.password)) {
+                resp.setStatus(400);
+                out.print("{\"error\":\"Password must be at least 6 characters, include letters and digits\"}");
+                return;
+            }
 
-            // === Check email tồn tại (nếu cần) ===
             UsersDAO dao = new UsersDAO();
-            try {
-                if (dao.existsByEmail(input.email)) {
-                    resp.setStatus(409);
-                    out.print("{\"error\":\"Email already exists\"}");
-                    System.out.println("[send-otp] ⚠ Email already exists: " + input.email);
-                    return;
-                }
-            } catch (Exception ex) {
-                ex.printStackTrace();
-                resp.setStatus(500);
-                out.print("{\"error\":\"Database error at existsByEmail\"}");
+            if (dao.existsByEmail(input.email)) {
+                resp.setStatus(409);
+                out.print("{\"error\":\"Email already exists\"}");
                 return;
             }
 
-            // === Sinh & lưu OTP ===
+            // Sinh & lưu OTP tạm
             String otp = EmailService.generateOtp();
             OtpCache.put(input.email, input.fullName, input.phone, input.password, otp);
-            System.out.println("[send-otp] ✅ Generated OTP: " + otp);
+            System.out.println("[send-otp] ✅ Generated OTP " + otp + " for " + input.email);
 
-            // === Gửi email OTP ===
             boolean sent = EmailService.sendRegistrationOtpEmail(input.email, otp);
             if (!sent) {
-                System.err.println("[send-otp] ❌ Failed to send OTP email to " + input.email);
-                // Tạm thời vẫn trả thành công để test FE
-                // resp.setStatus(502);
-                // out.print("{\"error\":\"Failed to send OTP email\"}");
-                // return;
-                out.print("{\"status\":\"otp_sent\",\"message\":\"(DEBUG MODE) OTP generated but email sending failed; check logs\"}");
+                resp.setStatus(502);
+                out.print("{\"error\":\"Failed to send OTP email\"}");
                 return;
             }
-
-            System.out.println("[send-otp] ✅ Email sent successfully to: " + input.email);
 
             resp.setStatus(200);
             out.print("{\"status\":\"otp_sent\",\"message\":\"OTP has been sent to your email\"}");

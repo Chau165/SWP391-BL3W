@@ -1,5 +1,7 @@
 package DTO;
 
+import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.Date;
 
 public class Users {
@@ -11,7 +13,7 @@ public class Users {
     private String passwordHash;
     private String role;
     private String status;
-    private Date createdAt;
+    private LocalDateTime createdAt;
 
     // ==================== Constructor ====================
 
@@ -19,7 +21,7 @@ public class Users {
     }
 
     public Users(int id, String fullName, String email, String phone, String passwordHash,
-                 String role, String status, Date createdAt) {
+                 String role, String status, LocalDateTime createdAt) {
         this.id = id;
         this.fullName = fullName;
         this.email = email;
@@ -88,11 +90,11 @@ public class Users {
         this.status = status;
     }
 
-    public Date getCreatedAt() {
+    public LocalDateTime getCreatedAt() {
         return createdAt;
     }
 
-    public void setCreatedAt(Date createdAt) {
+    public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
     }
 

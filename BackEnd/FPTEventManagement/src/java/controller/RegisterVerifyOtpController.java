@@ -10,23 +10,21 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.*;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 
 @WebServlet("/api/register/verify-otp")
 public class RegisterVerifyOtpController extends HttpServlet {
 
     private final Gson gson = new Gson();
 
+    static class VerifyRequest {
+        String email;
+        String otp;
+    }
+
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         setCorsHeaders(resp, req);
         resp.setStatus(HttpServletResponse.SC_NO_CONTENT);
-    }
-
-    static class VerifyRequest {
-        String email;
-        String otp;
     }
 
     @Override
@@ -73,19 +71,17 @@ public class RegisterVerifyOtpController extends HttpServlet {
                 return;
             }
 
-            // OTP đúng → tạo user
             UsersDAO dao = new UsersDAO();
             if (dao.existsByEmail(p.email)) {
-                // Race condition phòng ngừa
                 OtpCache.remove(input.email);
                 resp.setStatus(409);
                 out.print("{\"error\":\"Email already exists\"}");
                 return;
             }
 
+            // Tạo Users từ PendingUser (đã hash password, set role/status)
             Users newUserEntity = p.toUsersEntity();
-            String rawPassword = p.getRawPassword();
-            int newId = dao.insertUser(newUserEntity, rawPassword);
+            int newId = dao.insertUser(newUserEntity);
             if (newId <= 0) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Failed to create user\"}");
@@ -99,7 +95,7 @@ public class RegisterVerifyOtpController extends HttpServlet {
                 return;
             }
 
-            // Xóa OTP cache sau khi dùng
+            // Xoá OTP khỏi cache
             OtpCache.remove(input.email);
 
             String token = JwtUtils.generateToken(newUser.getEmail(), newUser.getRole(), newUser.getId());
@@ -111,8 +107,6 @@ public class RegisterVerifyOtpController extends HttpServlet {
                     + "\"token\":\"" + token + "\","
                     + "\"user\":" + gson.toJson(newUser)
                     + "}");
-        } catch (Exception ex) {
-            Logger.getLogger(RegisterVerifyOtpController.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
 

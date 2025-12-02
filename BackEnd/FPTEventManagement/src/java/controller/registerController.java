@@ -5,6 +5,7 @@ import DTO.Users;
 import com.google.gson.Gson;
 import mylib.ValidationUtil;
 import utils.JwtUtils;
+import utils.PasswordUtils;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -14,12 +15,20 @@ import java.io.*;
 @WebServlet("/api/register")
 public class registerController extends HttpServlet {
 
-    // Helper cho Java 8 thay cho String.isBlank()
+    private final Gson gson = new Gson();
+
+    // Helper cho Java 8 (thay cho String.isBlank)
     private static boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
     }
 
-    private final Gson gson = new Gson();
+    // ====== DTO request chỉ dùng cho raw JSON từ FE ======
+    private static class RegisterRequest {
+        String fullName;
+        String phone;
+        String email;
+        String password; // mật khẩu chưa hash
+    }
 
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -31,47 +40,40 @@ public class registerController extends HttpServlet {
     protected void doPost(HttpServletRequest req, HttpServletResponse resp)
             throws ServletException, IOException {
 
-        // 🔑 Bảo đảm UTF-8 cho inbound/outbound
+        // UTF-8 cho request/response
         req.setCharacterEncoding("UTF-8");
         setCorsHeaders(resp, req);
         resp.setCharacterEncoding("UTF-8");
         resp.setContentType("application/json; charset=UTF-8");
 
-        try (BufferedReader reader = req.getReader(); PrintWriter out = resp.getWriter()) {
-            // Parse payload that includes raw password (Users DTO doesn't contain password)
-            class RegisterPayload {
-                String fullName;
-                String email;
-                String phone;
-                String password;
-                String role;
-                String status;
-            }
+        try (BufferedReader reader = req.getReader();
+             PrintWriter out = resp.getWriter()) {
 
-            RegisterPayload payload = gson.fromJson(reader, RegisterPayload.class);
-            if (payload == null) {
+            RegisterRequest input = gson.fromJson(reader, RegisterRequest.class);
+
+            if (input == null) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Invalid input\"}");
                 return;
             }
 
-            // Basic validation
-            if (!ValidationUtil.isValidFullName(payload.fullName)) {
+            // ====== Validate ======
+            if (!ValidationUtil.isValidFullName(input.fullName)) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Full name is invalid\"}");
                 return;
             }
-            if (!ValidationUtil.isValidVNPhone(payload.phone)) {
+            if (!ValidationUtil.isValidVNPhone(input.phone)) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Phone number is invalid\"}");
                 return;
             }
-            if (!ValidationUtil.isValidEmail(payload.email)) {
+            if (!ValidationUtil.isValidEmail(input.email)) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Email is invalid\"}");
                 return;
             }
-            if (!ValidationUtil.isValidPassword(payload.password)) {
+            if (!ValidationUtil.isValidPassword(input.password)) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Password must be at least 6 characters, include letters and digits\"}");
                 return;
@@ -79,29 +81,36 @@ public class registerController extends HttpServlet {
 
             UsersDAO dao = new UsersDAO();
 
-            try {
-                if (dao.existsByEmail(payload.email)) {
-                    resp.setStatus(409);
-                    out.print("{\"error\":\"Email already exists\"}");
-                    return;
-                }
+            // Email đã tồn tại chưa?
+            if (dao.existsByEmail(input.email)) {
+                resp.setStatus(409);
+                out.print("{\"error\":\"Email already exists\"}");
+                return;
+            }
 
-                // Build Users entity (Users doesn't include raw password)
-                Users toInsert = new Users();
-                toInsert.setFullName(payload.fullName);
-                toInsert.setEmail(payload.email);
-                toInsert.setPhone(payload.phone);
-                toInsert.setRole(payload.role != null ? payload.role : "Driver");
-                toInsert.setStatus(!isBlank(payload.status) ? payload.status : "Active");
+            // ====== Tạo entity Users theo DB mới ======
+            Users u = new Users();
+            u.setFullName(input.fullName);
+            u.setPhone(input.phone);
+            u.setEmail(input.email);
 
-                int newId = dao.insertUser(toInsert, payload.password);
+            // Hash password trước khi lưu
+            String hash = PasswordUtils.hashPassword(input.password);
+            u.setPasswordHash(hash);
+
+            // Mặc định role & status
+            u.setRole("STUDENT");
+            u.setStatus("ACTIVE");
+
+            // ====== Insert DB ======
+            int newId = dao.insertUser(u);
             if (newId <= 0) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Failed to create user\"}");
                 return;
             }
 
-            // ✅ Lấy lại user mới để sinh token
+            // Lấy lại user mới
             Users newUser = dao.findById(newId);
             if (newUser == null) {
                 resp.setStatus(500);
@@ -109,22 +118,16 @@ public class registerController extends HttpServlet {
                 return;
             }
 
-            // ✅ Sinh token JWT và trả luôn cho FE
+            // Sinh JWT
             String token = JwtUtils.generateToken(newUser.getEmail(), newUser.getRole(), newUser.getId());
 
             resp.setStatus(200);
             out.print("{"
                     + "\"status\":\"success\","
                     + "\"message\":\"Registered and logged in successfully\","
-                    + "\"token\":\"" + token + "\"," 
+                    + "\"token\":\"" + token + "\","
                     + "\"user\":" + gson.toJson(newUser)
                     + "}");
-            } catch (Exception e) {
-                e.printStackTrace();
-                resp.setStatus(500);
-                out.print("{\"error\":\"Internal server error\"}");
-                return;
-            }
         }
     }
 
