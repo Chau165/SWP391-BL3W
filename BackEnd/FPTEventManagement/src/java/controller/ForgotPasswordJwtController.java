@@ -68,16 +68,22 @@ public class ForgotPasswordJwtController extends HttpServlet {
         String otp = PasswordResetManager.generateOtp(email);
 
         // Link FE
-      String resetLink = "http://localhost:5173/#/reset-pass?token=" + token;
+        // Link to frontend (dev) and fallback backend link
+        String frontendLink = "http://localhost:5173/#/reset-pass?token=" + token;
+        String backendLink = request.getScheme() + "://" + request.getServerName() + ":" + request.getServerPort() + request.getContextPath() + "/reset-pass?token=" + token;
 
-        // ✅ Gửi email: cả link + OTP
+        // ✅ Gửi email: cả link + OTP + token rõ ràng để dùng trong API nếu cần
         String html = "<h2>🔐 Đặt lại mật khẩu</h2>"
-                + "<p>Xin chào, <b>" + user.getFullName() + "</b></p>"
-                + "<p>Mã OTP của bạn (hết hạn 5 phút): <b style='font-size:18px;letter-spacing:2px;'>" + otp + "</b></p>"
-                + "<p>Nhấn vào liên kết sau để mở trang đặt lại mật khẩu (hiệu lực 10 phút):</p>"
-                + "<p><a href='" + resetLink + "' "
-                + "style='background:#2563eb;color:white;padding:10px 15px;border-radius:6px;text-decoration:none;'>Đặt lại mật khẩu</a></p>"
-                + "<p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>";
+            + "<p>Xin chào, <b>" + user.getFullName() + "</b></p>"
+            + "<p>Mã OTP của bạn (hết hạn 5 phút): <b style='font-size:18px;letter-spacing:2px;'>" + otp + "</b></p>"
+            + "<p>Token đặt lại mật khẩu (hiệu lực 10 phút): <b style='font-family:monospace;color:#333;'>" + token + "</b></p>"
+            + "<p>Nhấn vào liên kết sau để mở trang đặt lại mật khẩu (FE dev):</p>"
+            + "<p><a href='" + frontendLink + "' style='background:#2563eb;color:white;padding:10px 15px;border-radius:6px;text-decoration:none;'>Mở trang đặt lại mật khẩu (FE)</a></p>"
+            + "<p>Nếu frontend không chạy, bạn có thể dùng liên kết này (backend fallback):</p>"
+            + "<p><a href='" + backendLink + "' style='background:#4caf50;color:white;padding:10px 15px;border-radius:6px;text-decoration:none;'>Mở trang đặt lại mật khẩu (Server)</a></p>"
+            + "<p>Hoặc sử dụng API `POST /api/reset-password` với thân JSON:</p>"
+            + "<pre>{\n  \"token\": \"<token từ email>\",\n  \"otp\": \"<mã OTP>\",\n  \"newPassword\": \"<mật khẩu mới>\"\n}</pre>"
+            + "<p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>";
 
         boolean sent = EmailService.sendCustomEmail(email, "Đặt lại mật khẩu - FPT Event Ticketing System", html);
 
