@@ -184,11 +184,11 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "example": "otp_sent"
+                      "example": "string"
                     },
                     "message": {
                       "type": "string",
-                      "example": "OTP has been sent to your email"
+                      "example": "string"
                     }
                   }
                 }
@@ -221,7 +221,7 @@
                   "email": {
                     "type": "string",
                     "format": "email",
-                    "example": "student@fpt.edu.vn"
+                    "example": "string"
                   }
                 }
               }
@@ -258,12 +258,12 @@
                   "email": {
                     "type": "string",
                     "format": "email",
-                    "example": "student@fpt.edu.vn"
+                    "example": "string"
                   },
                   "otp": {
                     "type": "string",
                     "pattern": "^[0-9]{6}$",
-                    "example": "123456"
+                    "example": "string"
                   }
                 }
               }
@@ -280,11 +280,11 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "example": "success"
+                      "example": "string"
                     },
                     "message": {
                       "type": "string",
-                      "example": "Registered and logged in successfully"
+                      "example": "string"
                     },
                     "token": {
                       "type": "string"
@@ -326,7 +326,7 @@
                   "email": {
                     "type": "string",
                     "format": "email",
-                    "example": "student@fpt.edu.vn"
+                    "example": "string"
                   }
                 }
               }
@@ -343,11 +343,11 @@
                   "properties": {
                     "status": {
                       "type": "string",
-                      "example": "success"
+                      "example": "string"
                     },
                     "message": {
                       "type": "string",
-                      "example": "Đã gửi OTP và link đặt lại mật khẩu tới email"
+                      "example": "string"
                     }
                   }
                 }
@@ -387,12 +387,12 @@
                   "otp": {
                     "type": "string",
                     "pattern": "^[0-9]{6}$",
-                    "example": "123456"
+                    "example": "string"
                   },
                   "newPassword": {
                     "type": "string",
                     "minLength": 6,
-                    "example": "newpassword123"
+                    "example": "string"
                   }
                 }
               }
@@ -431,10 +431,10 @@
             "name": "status",
             "in": "query",
             "description": "Lọc theo trạng thái sự kiện",
-            "schema": {
+              "schema": {
               "type": "string",
               "enum": ["UPCOMING", "ONGOING", "COMPLETED"],
-              "example": "UPCOMING"
+              "example": "string"
             }
           }
         ],
@@ -1178,13 +1178,13 @@
             "type": "string",
             "format": "email",
             "description": "Email đăng nhập",
-            "example": "student@fpt.edu.vn"
+            "example": "string"
           },
           "password": {
             "type": "string",
             "format": "password",
             "description": "Mật khẩu",
-            "example": "password123"
+            "example": "string"
           }
         }
       },
@@ -1194,12 +1194,12 @@
           "status": {
             "type": "string",
             "enum": ["success"],
-            "example": "success"
+            "example": "string"
           },
           "token": {
             "type": "string",
             "description": "JWT access token",
-            "example": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+            "example": "string"
           },
           "user": {
             "$ref": "#/components/schemas/User"
@@ -1213,26 +1213,26 @@
           "fullName": {
             "type": "string",
             "description": "Họ và tên",
-            "example": "Nguyễn Văn A"
+            "example": "string"
           },
           "phone": {
             "type": "string",
             "pattern": "^0[0-9]{9,10}$",
             "description": "Số điện thoại",
-            "example": "0912345678"
+            "example": "string"
           },
           "email": {
             "type": "string",
             "format": "email",
             "description": "Email",
-            "example": "student@fpt.edu.vn"
+            "example": "string"
           },
           "password": {
             "type": "string",
             "format": "password",
             "minLength": 6,
             "description": "Mật khẩu (tối thiểu 6 ký tự)",
-            "example": "password123"
+            "example": "string"
           }
         }
       },
@@ -1241,36 +1241,37 @@
         "properties": {
           "id": {
             "type": "integer",
-            "example": 1
+            "example": "string"
           },
           "fullName": {
             "type": "string",
-            "example": "Nguyễn Văn A"
+            "example": "string"
           },
           "email": {
             "type": "string",
             "format": "email",
-            "example": "student@fpt.edu.vn"
+            "example": "string"
           },
           "phone": {
             "type": "string",
-            "example": "0912345678"
+            "example": "string"
           },
           "role": {
             "type": "string",
             "enum": ["Student", "Event Organizer", "Staff"],
             "description": "Vai trò người dùng",
-            "example": "Student"
+            "example": "string"
           },
           "status": {
             "type": "string",
             "enum": ["ACTIVE", "INACTIVE", "BLOCKED"],
             "description": "Trạng thái tài khoản",
-            "example": "ACTIVE"
+            "example": "string"
           },
           "createdAt": {
             "type": "string",
-            "format": "date-time"
+            "format": "date-time",
+            "example": "string"
           }
         }
       },
@@ -1280,17 +1281,17 @@
           "status": {
             "type": "string",
             "enum": ["fail", "error"],
-            "example": "fail"
+            "example": "string"
           },
           "code": {
             "type": "string",
             "description": "Mã lỗi",
-            "example": "AUTH_INVALID"
+            "example": "string"
           },
           "message": {
             "type": "string",
             "description": "Mô tả lỗi",
-            "example": "Email hoặc mật khẩu không hợp lệ"
+            "example": "string"
           }
         }
       }
