@@ -51,8 +51,8 @@
                 "student": {
                   "summary": "Đăng nhập sinh viên",
                   "value": {
-                    "email": "student@fpt.edu.vn",
-                    "password": "password123"
+                    "email": "string",
+                    "password": "string"
                   }
                 }
               }
@@ -115,6 +115,45 @@
                 }
               }
             }
+          }
+        }
+      }
+    },
+    "/api/register": {
+      "post": {
+        "tags": ["Guest"],
+        "summary": "[Guest] Đăng ký tài khoản mới",
+        "description": "Tạo tài khoản mới bằng fullName, phone, email và password (trả về 201 khi thành công)",
+        "operationId": "register",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/RegisterRequest"
+              },
+              "examples": {
+                "example": {
+                  "value": {
+                    "fullName": "string",
+                    "phone": "string",
+                    "email": "string",
+                    "password": "string"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Đăng ký thành công"
+          },
+          "400": {
+            "description": "Dữ liệu không hợp lệ"
+          },
+          "409": {
+            "description": "Email đã tồn tại"
           }
         }
       }
