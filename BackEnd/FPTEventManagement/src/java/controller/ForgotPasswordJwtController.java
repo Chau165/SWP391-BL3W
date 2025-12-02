@@ -79,7 +79,7 @@ public class ForgotPasswordJwtController extends HttpServlet {
                 + "style='background:#2563eb;color:white;padding:10px 15px;border-radius:6px;text-decoration:none;'>Đặt lại mật khẩu</a></p>"
                 + "<p>Nếu bạn không yêu cầu, vui lòng bỏ qua email này.</p>";
 
-        boolean sent = EmailService.sendCustomEmail(email, "Đặt lại mật khẩu - EV Battery Swap", html);
+        boolean sent = EmailService.sendCustomEmail(email, "Đặt lại mật khẩu - FPT Event Ticketing System", html);
 
         if (!sent) {
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);

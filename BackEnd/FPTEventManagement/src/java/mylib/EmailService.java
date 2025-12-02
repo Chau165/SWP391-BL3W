@@ -28,20 +28,20 @@ public class EmailService {
             Session session = createSession();
             MimeMessage message = new MimeMessage(session);
 
-            message.setFrom(new InternetAddress(EMAIL_FROM, "EV Battery Swap System", "UTF-8"));
-            message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail));
-            message.setSubject("Xác thực Email Đăng Ký - EV Battery Swap", "UTF-8");
+                message.setFrom(new InternetAddress(EMAIL_FROM, "FPT Event Ticketing System", "UTF-8"));
+                message.setRecipients(Message.RecipientType.TO, InternetAddress.parse(toEmail));
+                message.setSubject("Xác thực Email Đăng Ký - FPT Event Ticketing System", "UTF-8");
 
-            String html = "<html><body style='font-family:Arial,sans-serif;'>"
+                String html = "<html><body style='font-family:Arial,sans-serif;'>"
                     + "<h2 style='color:#2196F3;text-align:center;'>✉️ Xác Thực Email Đăng Ký</h2>"
-                    + "<p>Cảm ơn bạn đã đăng ký tài khoản <strong>EV Battery Swap</strong>.</p>"
+                    + "<p>Cảm ơn bạn đã đăng ký tài khoản <strong>FPT Event Ticketing System</strong>.</p>"
                     + "<p>Mã OTP xác thực của bạn là:</p>"
                     + "<div style='background:#e3f2fd;padding:15px;border-radius:6px;text-align:center;'>"
                     + "<h1 style='color:#2196F3;'>" + otp + "</h1>"
                     + "<p>Mã OTP có hiệu lực trong 5 phút.</p>"
                     + "</div>"
                     + "<p>Nếu bạn không yêu cầu đăng ký, vui lòng bỏ qua email này.</p>"
-                    + "<hr><p style='text-align:center;font-size:12px;color:#888;'>EV Battery Swap System</p>"
+                    + "<hr><p style='text-align:center;font-size:12px;color:#888;'>FPT Event Ticketing System</p>"
                     + "</body></html>";
 
             message.setContent(html, "text/html; charset=UTF-8");
@@ -62,17 +62,17 @@ public class EmailService {
             Session session = createSession();
             MimeMessage message = new MimeMessage(session);
 
-            message.setFrom(new InternetAddress(EMAIL_FROM, "EV Battery Swap System", "UTF-8"));
+            message.setFrom(new InternetAddress(EMAIL_FROM, "FPT Event Ticketing System", "UTF-8"));
             message.addRecipient(Message.RecipientType.TO, new InternetAddress(toEmail));
             message.setSubject(subject, "UTF-8");
             message.setContent(htmlContent, "text/html; charset=UTF-8");
 
             Transport.send(message);
-            System.out.println("[EmailService] ✅ Reset link email sent to: " + toEmail);
+            System.out.println("[EmailService] ✅ Email sent (FPT Event Ticketing System) to: " + toEmail);
             return true;
 
         } catch (Exception e) {
-            System.err.println("[EmailService] ❌ Failed to send reset link email: " + e.getMessage());
+            System.err.println("[EmailService] ❌ Failed to send email (FPT Event Ticketing System): " + e.getMessage());
             e.printStackTrace();
             return false;
         }
