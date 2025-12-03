@@ -419,7 +419,7 @@
         "operationId": "getEvents",
         "security": []
       }
-        ],
+        },
         "parameters": [
           {
             "name": "status",
@@ -569,7 +569,7 @@
           }
         }
       }
-    },
+    ,
     "/api/events/{eventId}": {
       "get": {
         "tags": ["Student"],
@@ -1161,7 +1161,7 @@
         }
       }
     }
-  },
+  ,
   "components": {
     "schemas": {
       "LoginRequest": {
