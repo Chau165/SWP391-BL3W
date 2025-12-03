@@ -18,6 +18,7 @@ public class GetAllSeatsController extends HttpServlet {
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        setCorsHeaders(resp, req);
         resp.setContentType("application/json;charset=UTF-8");
 
         try {
@@ -68,6 +69,7 @@ public class GetAllSeatsController extends HttpServlet {
 
     // Class nhỏ để wrap response
     private static class SeatResponse {
+
         private int areaId;       // 🔁 thay venueId -> areaId
         private String seatType;
         private int total;
@@ -105,4 +107,32 @@ public class GetAllSeatsController extends HttpServlet {
             this.seats = seats;
         }
     }
+
+    private void setCorsHeaders(HttpServletResponse res, HttpServletRequest req) {
+        String origin = req.getHeader("Origin");
+
+        boolean allowed = origin != null && (origin.equals("http://localhost:5173")
+                || origin.equals("http://127.0.0.1:5173")
+                || origin.equals("http://localhost:3000")
+                || origin.equals("http://127.0.0.1:3000")
+                || origin.contains("ngrok-free.app")
+                || // ⭐ Cho phép ngrok
+                origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
+                );
+
+        if (allowed) {
+            res.setHeader("Access-Control-Allow-Origin", origin);
+            res.setHeader("Access-Control-Allow-Credentials", "true");
+        } else {
+            res.setHeader("Access-Control-Allow-Origin", "null");
+        }
+
+        res.setHeader("Vary", "Origin");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers",
+                "Content-Type, Authorization, ngrok-skip-browser-warning");
+        res.setHeader("Access-Control-Expose-Headers", "Authorization");
+        res.setHeader("Access-Control-Max-Age", "86400");
+    }
+
 }

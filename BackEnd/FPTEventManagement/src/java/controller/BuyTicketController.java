@@ -25,6 +25,8 @@ import java.nio.charset.StandardCharsets;
 import java.sql.Timestamp;
 import java.util.*;
 
+import utils.QRCodeUtil; // ✅ nhớ import
+
 @WebServlet("/api/buyTicket")
 public class BuyTicketController extends HttpServlet {
 
@@ -115,6 +117,12 @@ public class BuyTicketController extends HttpServlet {
                 return;
             }
 
+            // ✅ chỉ cho đặt ghế đang ACTIVE
+            if (!"ACTIVE".equalsIgnoreCase(seat.getStatus())) {
+                resp.getWriter().println("⚠️ Ghế không còn khả dụng (đã được đặt hoặc khóa).");
+                return;
+            }
+
             if (seatDAO.isSeatAlreadyBookedForEvent(eventId, seatId)) {
                 resp.getWriter().println("⚠️ Seat đã được đặt cho event này.");
                 return;
@@ -139,35 +147,57 @@ public class BuyTicketController extends HttpServlet {
                 return;
             }
 
-            // ===== 7. Tạo Ticket =====
+            // ===== 7. Tạo Ticket (chưa có QR, chỉ tạo record) =====
             Ticket ticket = new Ticket();
             ticket.setEventId(eventId);
             ticket.setUserId(userId);
             ticket.setCategoryTicketId(categoryTicketId);
             ticket.setBillId(billId);
             ticket.setSeatId(seatId);
-
-            String qr = "EV" + eventId + "-U" + userId + "-S" + seatId + "-" + System.currentTimeMillis();
-            ticket.setQrCodeValue(qr);
             ticket.setStatus("BOOKED");
             ticket.setQrIssuedAt(new Timestamp(System.currentTimeMillis()));
             ticket.setCheckinTime(null);
 
             TicketDAO ticketDAO = new TicketDAO();
-            boolean ok = ticketDAO.insertTicket(ticket);
+            int ticketId = ticketDAO.insertTicketAndReturnId(ticket);
 
-            if (!ok) {
+            if (ticketId <= 0) {
                 resp.getWriter().println("⚠️ Thanh toán đã PAID nhưng tạo Ticket thất bại!");
+                return;
+            }
+
+            // ===== 7.1. Tạo QR từ ticket_id (QR chỉ chứa ticket_id) =====
+            String qrBase64;
+            try {
+                qrBase64 = QRCodeUtil.generateTicketQrBase64(ticketId, 300, 300);
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                resp.getWriter().println("⚠️ Tạo QR code thất bại, vui lòng liên hệ hỗ trợ.");
+                return;
+            }
+
+            // Cập nhật QR vào ticket
+            boolean qrUpdated = ticketDAO.updateTicketQr(ticketId, qrBase64);
+            if (!qrUpdated) {
+                resp.getWriter().println("⚠️ Vé đã tạo nhưng cập nhật QR code thất bại. Vui lòng liên hệ hỗ trợ.");
+                return;
+            }
+
+            // ===== 7.2. Cập nhật trạng thái ghế sang INACTIVE =====
+            boolean seatUpdated = seatDAO.updateSeatStatus(seatId, "INACTIVE");
+            if (!seatUpdated) {
+                resp.getWriter().println("⚠️ Vé đã tạo nhưng cập nhật trạng thái ghế thất bại. Vui lòng liên hệ hỗ trợ.");
                 return;
             }
 
             // ===== 8. Success =====
             resp.getWriter().println("✅ Đặt vé thành công!\n"
+                    + "Ticket ID: " + ticketId + "\n"
                     + "Event ID: " + eventId + "\n"
                     + "Seat: " + seat.getSeatCode() + "\n"
                     + "Loại vé: " + ct.getName() + "\n"
                     + "Số tiền: " + amount + " VND\n"
-                    + "QR: " + qr);
+                    + "QR (Base64 - rút gọn): " + qrBase64.substring(0, 40) + "...");
 
         } catch (Exception e) {
             e.printStackTrace();

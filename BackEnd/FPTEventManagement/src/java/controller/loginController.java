@@ -4,7 +4,6 @@ import DAO.UsersDAO;
 import DTO.Users;
 import com.google.gson.Gson;
 
-
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.*;
@@ -12,6 +11,7 @@ import utils.JwtUtils;
 
 @WebServlet("/api/login")
 public class loginController extends HttpServlet {
+
     private final UsersDAO usersDAO = new UsersDAO();
     private final Gson gson = new Gson();
 
@@ -28,8 +28,7 @@ public class loginController extends HttpServlet {
         setCorsHeaders(response, request);
         response.setContentType("application/json;charset=UTF-8");
 
-        try (BufferedReader reader = request.getReader();
-             PrintWriter out = response.getWriter()) {
+        try ( BufferedReader reader = request.getReader();  PrintWriter out = response.getWriter()) {
 
             LoginRequest loginReq = gson.fromJson(reader, LoginRequest.class);
 
@@ -70,7 +69,7 @@ public class loginController extends HttpServlet {
         } catch (Exception e) {
             e.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            try (PrintWriter out = response.getWriter()) {
+            try ( PrintWriter out = response.getWriter()) {
                 out.print(jsonError("Lỗi server: " + e.getMessage()));
                 out.flush();
             }
@@ -81,10 +80,14 @@ public class loginController extends HttpServlet {
     private void setCorsHeaders(HttpServletResponse res, HttpServletRequest req) {
         String origin = req.getHeader("Origin");
 
-        boolean allowed = origin != null && (
-                origin.equals("http://localhost:5173") ||
-                origin.equals("http://127.0.0.1:5173")
-        );
+        boolean allowed = origin != null && (origin.equals("http://localhost:5173")
+                || origin.equals("http://127.0.0.1:5173")
+                || origin.equals("http://localhost:3000")
+                || origin.equals("http://127.0.0.1:3000")
+                || origin.contains("ngrok-free.app")
+                || // ⭐ Cho phép ngrok
+                origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
+                );
 
         if (allowed) {
             res.setHeader("Access-Control-Allow-Origin", origin);
@@ -95,7 +98,8 @@ public class loginController extends HttpServlet {
 
         res.setHeader("Vary", "Origin");
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, ngrok-skip-browser-warning");
+        res.setHeader("Access-Control-Allow-Headers",
+                "Content-Type, Authorization, ngrok-skip-browser-warning");
         res.setHeader("Access-Control-Expose-Headers", "Authorization");
         res.setHeader("Access-Control-Max-Age", "86400");
     }
@@ -120,11 +124,13 @@ public class loginController extends HttpServlet {
 
     // ==================== DTOs ====================
     private static class LoginRequest {
+
         String email;
         String password;
     }
 
     private static class LoginResponse {
+
         String status;
         String token;
         Users user;

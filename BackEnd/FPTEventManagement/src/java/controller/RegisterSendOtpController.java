@@ -17,6 +17,7 @@ public class RegisterSendOtpController extends HttpServlet {
     private final Gson gson = new Gson();
 
     static class RegisterRequest {
+
         String fullName;
         String phone;
         String email;
@@ -37,7 +38,7 @@ public class RegisterSendOtpController extends HttpServlet {
         resp.setContentType("application/json;charset=UTF-8");
         req.setCharacterEncoding("UTF-8");
 
-        try (BufferedReader reader = req.getReader(); PrintWriter out = resp.getWriter()) {
+        try ( BufferedReader reader = req.getReader();  PrintWriter out = resp.getWriter()) {
 
             RegisterRequest input = gson.fromJson(reader, RegisterRequest.class);
             if (input == null) {
@@ -99,12 +100,15 @@ public class RegisterSendOtpController extends HttpServlet {
     // ================= CORS =================
     private void setCorsHeaders(HttpServletResponse res, HttpServletRequest req) {
         String origin = req.getHeader("Origin");
-        boolean allowed = origin != null && (
-                "http://localhost:5173".equals(origin) ||
-                "http://127.0.0.1:5173".equals(origin) ||
-                origin.endsWith(".ngrok-free.app") ||
-                origin.endsWith(".ngrok.app")
-        );
+
+        boolean allowed = origin != null && (origin.equals("http://localhost:5173")
+                || origin.equals("http://127.0.0.1:5173")
+                || origin.equals("http://localhost:3000")
+                || origin.equals("http://127.0.0.1:3000")
+                || origin.contains("ngrok-free.app")
+                || // ⭐ Cho phép ngrok
+                origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
+                );
 
         if (allowed) {
             res.setHeader("Access-Control-Allow-Origin", origin);
@@ -120,4 +124,5 @@ public class RegisterSendOtpController extends HttpServlet {
         res.setHeader("Access-Control-Expose-Headers", "Authorization");
         res.setHeader("Access-Control-Max-Age", "86400");
     }
+
 }

@@ -24,6 +24,7 @@ public class registerController extends HttpServlet {
 
     // ====== DTO request chỉ dùng cho raw JSON từ FE ======
     private static class RegisterRequest {
+
         String fullName;
         String phone;
         String email;
@@ -46,8 +47,7 @@ public class registerController extends HttpServlet {
         resp.setCharacterEncoding("UTF-8");
         resp.setContentType("application/json; charset=UTF-8");
 
-        try (BufferedReader reader = req.getReader();
-             PrintWriter out = resp.getWriter()) {
+        try ( BufferedReader reader = req.getReader();  PrintWriter out = resp.getWriter()) {
 
             RegisterRequest input = gson.fromJson(reader, RegisterRequest.class);
 
@@ -134,12 +134,15 @@ public class registerController extends HttpServlet {
     // ========== CORS ==========
     private void setCorsHeaders(HttpServletResponse res, HttpServletRequest req) {
         String origin = req.getHeader("Origin");
-        boolean allowed = origin != null && (
-                "http://localhost:5173".equals(origin) ||
-                "http://127.0.0.1:5173".equals(origin) ||
-                origin.endsWith(".ngrok-free.app") ||
-                origin.endsWith(".ngrok.app")
-        );
+
+        boolean allowed = origin != null && (origin.equals("http://localhost:5173")
+                || origin.equals("http://127.0.0.1:5173")
+                || origin.equals("http://localhost:3000")
+                || origin.equals("http://127.0.0.1:3000")
+                || origin.contains("ngrok-free.app")
+                || // ⭐ Cho phép ngrok
+                origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
+                );
 
         if (allowed) {
             res.setHeader("Access-Control-Allow-Origin", origin);
@@ -150,8 +153,10 @@ public class registerController extends HttpServlet {
 
         res.setHeader("Vary", "Origin");
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
-        res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, ngrok-skip-browser-warning");
+        res.setHeader("Access-Control-Allow-Headers",
+                "Content-Type, Authorization, ngrok-skip-browser-warning");
         res.setHeader("Access-Control-Expose-Headers", "Authorization");
         res.setHeader("Access-Control-Max-Age", "86400");
     }
+
 }

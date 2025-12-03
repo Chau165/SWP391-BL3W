@@ -36,7 +36,7 @@ public class GetAllEventsController extends HttpServlet {
         String role = (String) request.getAttribute("role");
         if (!isAllowedRole(role)) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            try (PrintWriter out = response.getWriter()) {
+            try ( PrintWriter out = response.getWriter()) {
                 out.write("{\"message\":\"Forbidden: your role is not allowed to access this resource\"}");
             }
             return;
@@ -63,14 +63,14 @@ public class GetAllEventsController extends HttpServlet {
 
             // ===== 3. Trả JSON =====
             String json = gson.toJson(result);
-            try (PrintWriter out = response.getWriter()) {
+            try ( PrintWriter out = response.getWriter()) {
                 out.write(json);
             }
 
         } catch (SQLException ex) {
             ex.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            try (PrintWriter out = response.getWriter()) {
+            try ( PrintWriter out = response.getWriter()) {
                 out.write("{\"message\":\"Internal server error when loading events\"}");
             }
         } catch (ClassNotFoundException ex) {
@@ -79,7 +79,9 @@ public class GetAllEventsController extends HttpServlet {
     }
 
     private boolean isAllowedRole(String role) {
-        if (role == null) return false;
+        if (role == null) {
+            return false;
+        }
         switch (role) {
             case "STUDENT":
             case "ORGANIZER":
@@ -91,14 +93,31 @@ public class GetAllEventsController extends HttpServlet {
         }
     }
 
-    private void setCorsHeaders(HttpServletResponse resp, HttpServletRequest req) {
+    private void setCorsHeaders(HttpServletResponse res, HttpServletRequest req) {
         String origin = req.getHeader("Origin");
-        if (origin == null || origin.isEmpty()) {
-            origin = "*";
+
+        boolean allowed = origin != null && (origin.equals("http://localhost:5173")
+                || origin.equals("http://127.0.0.1:5173")
+                || origin.equals("http://localhost:3000")
+                || origin.equals("http://127.0.0.1:3000")
+                || origin.contains("ngrok-free.app")
+                || // ⭐ Cho phép ngrok
+                origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
+                );
+
+        if (allowed) {
+            res.setHeader("Access-Control-Allow-Origin", origin);
+            res.setHeader("Access-Control-Allow-Credentials", "true");
+        } else {
+            res.setHeader("Access-Control-Allow-Origin", "null");
         }
-        resp.setHeader("Access-Control-Allow-Origin", origin);
-        resp.setHeader("Access-Control-Allow-Credentials", "true");
-        resp.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Requested-With");
-        resp.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+
+        res.setHeader("Vary", "Origin");
+        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Headers",
+                "Content-Type, Authorization, ngrok-skip-browser-warning");
+        res.setHeader("Access-Control-Expose-Headers", "Authorization");
+        res.setHeader("Access-Control-Max-Age", "86400");
     }
+
 }
