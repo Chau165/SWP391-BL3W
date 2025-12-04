@@ -4,6 +4,7 @@ import DAO.EventDAO;
 import DTO.Event;
 import DTO.EventListDto;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;   // ✅ IMPORT
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
@@ -19,7 +20,10 @@ import java.util.logging.Logger;
 public class GetAllEventsController extends HttpServlet {
 
     private final EventDAO eventDAO = new EventDAO();
-    private final Gson gson = new Gson();
+    // ✅ Dùng GsonBuilder và serializeNulls
+    private final Gson gson = new GsonBuilder()
+            .serializeNulls() // => field = null vẫn xuất hiện trong JSON
+            .create();
 
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -56,7 +60,8 @@ public class GetAllEventsController extends HttpServlet {
                         e.getStartTime(),
                         e.getEndTime(),
                         e.getMaxSeats(),
-                        e.getStatus()
+                        e.getStatus(),
+                        e.getBannerUrl() // ✅ map bannerUrl ra cho FE
                 );
                 result.add(dto);
             }
@@ -101,9 +106,7 @@ public class GetAllEventsController extends HttpServlet {
                 || origin.equals("http://localhost:3000")
                 || origin.equals("http://127.0.0.1:3000")
                 || origin.contains("ngrok-free.app")
-                || // ⭐ Cho phép ngrok
-                origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
-                );
+                || origin.contains("ngrok.app"));
 
         if (allowed) {
             res.setHeader("Access-Control-Allow-Origin", origin);

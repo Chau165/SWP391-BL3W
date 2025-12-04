@@ -362,6 +362,30 @@ public class EventRequestDAO {
         }
         return false;
     }
+    
+      // ======================= THÊM MỚI: LẤY REQUEST THEO created_event_id =======================
+    public EventRequest getByCreatedEventId(int eventId) {
+        String sql = "SELECT request_id, requester_id, title, description, "
+                + "preferred_start_time, preferred_end_time, expected_capacity, "
+                + "status, created_at, processed_by, processed_at, organizer_note, created_event_id "
+                + "FROM Event_Request WHERE created_event_id = ?";
+
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, eventId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapRow(rs);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ERROR] getByCreatedEventId: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
 
     // ======================= MAP ROW =======================
     private EventRequest mapRow(ResultSet rs) throws SQLException {

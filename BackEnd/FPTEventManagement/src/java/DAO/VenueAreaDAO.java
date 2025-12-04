@@ -1,4 +1,3 @@
-
 package DAO;
 
 import DTO.VenueArea;
@@ -11,14 +10,13 @@ import java.util.List;
 public class VenueAreaDAO {
 
     /**
-     * Lấy danh sách Area KHÔNG có Event nào trùng khoảng [start, end]
-     * với buffer 1 giờ trước & sau.Rule overlap với buffer 1h:
-   existing.start_time < (end + 1h)
-   AND existing.end_time > (start - 1h)
+     * Lấy danh sách Area KHÔNG có Event nào trùng khoảng [start, end] với
+     * buffer 1 giờ trước & sau.Rule overlap với buffer 1h: existing.start_time < (end + 1h)
+     * AND existing.end_time > (start - 1h)
      *
      * @param start
      * @param end
-     * @return 
+     * @return
      */
     public List<VenueArea> getFreeAreasWith1hBuffer(Timestamp start, Timestamp end) {
         List<VenueArea> list = new ArrayList<>();
@@ -26,30 +24,31 @@ public class VenueAreaDAO {
         // ===== Tính buffer 1h =====
         long ONE_HOUR_MS = 60L * 60L * 1000L;
         Timestamp startBuffer = new Timestamp(start.getTime() - ONE_HOUR_MS); // start - 1h
-        Timestamp endBuffer   = new Timestamp(end.getTime() + ONE_HOUR_MS);   // end + 1h
+        Timestamp endBuffer = new Timestamp(end.getTime() + ONE_HOUR_MS);   // end + 1h
 
-        String sql =
-                "SELECT va.area_id, va.venue_id, va.area_name, va.floor, va.capacity, va.status " +
-                "FROM Venue_Area va " +
-                "WHERE va.status = 'AVAILABLE' " +
-                "  AND NOT EXISTS ( " +
-                "      SELECT 1 FROM Event e " +
-                "      WHERE e.area_id = va.area_id " +
-                "        AND e.status IN ('OPEN','CLOSED','DRAFT') " +
-                "        AND e.start_time < ? " +   // endBuffer
-                "        AND e.end_time   > ? " +   // startBuffer
-                "  ) " +
-                "ORDER BY va.venue_id, va.area_name";
+        String sql
+                = "SELECT va.area_id, va.venue_id, va.area_name, va.floor, va.capacity, va.status "
+                + "FROM Venue_Area va "
+                + "WHERE va.status = 'AVAILABLE' "
+                + "  AND NOT EXISTS ( "
+                + "      SELECT 1 FROM Event e "
+                + "      WHERE e.area_id = va.area_id "
+                + "        AND e.status IN ('OPEN','CLOSED','DRAFT') "
+                + "        AND e.start_time < ? "
+                + // endBuffer
+                "        AND e.end_time   > ? "
+                + // startBuffer
+                "  ) "
+                + "ORDER BY va.venue_id, va.area_name";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setTimestamp(1, endBuffer);
             ps.setTimestamp(2, startBuffer);
 
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    VenueArea va = new VenueArea();
+                    VenueArea va  = new VenueArea();
                     va.setAreaId(rs.getInt("area_id"));
                     va.setVenueId(rs.getInt("venue_id"));
                     va.setAreaName(rs.getNString("area_name"));
@@ -70,13 +69,11 @@ public class VenueAreaDAO {
     public List<VenueArea> getAllAreas() {
         List<VenueArea> list = new ArrayList<>();
         String sql = "SELECT area_id, venue_id, area_name, floor, capacity, status FROM Venue_Area ORDER BY venue_id, area_name";
-        
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
-            
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql);  ResultSet rs = ps.executeQuery()) {
+
             while (rs.next()) {
-                VenueArea va = new VenueArea();
+                VenueArea va  = new VenueArea();
                 va.setAreaId(rs.getInt("area_id"));
                 va.setVenueId(rs.getInt("venue_id"));
                 va.setAreaName(rs.getNString("area_name"));
@@ -96,14 +93,13 @@ public class VenueAreaDAO {
     public List<VenueArea> getAreasByVenueId(int venueId) {
         List<VenueArea> list = new ArrayList<>();
         String sql = "SELECT area_id, venue_id, area_name, floor, capacity, status FROM Venue_Area WHERE venue_id = ? ORDER BY area_name";
-        
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, venueId);
-            
-            try (ResultSet rs = ps.executeQuery()) {
+
+            try ( ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    VenueArea va = new VenueArea();
+                    VenueArea va  = new VenueArea();
                     va.setAreaId(rs.getInt("area_id"));
                     va.setVenueId(rs.getInt("venue_id"));
                     va.setAreaName(rs.getNString("area_name"));
@@ -123,8 +119,7 @@ public class VenueAreaDAO {
     // Create new venue area
     public boolean createArea(int venueId, String areaName, String floor, int capacity) {
         String sql = "INSERT INTO Venue_Area (venue_id, area_name, floor, capacity, status) VALUES (?, ?, ?, ?, N'AVAILABLE')";
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, venueId);
             ps.setNString(2, areaName);
             ps.setNString(3, floor);
@@ -141,10 +136,9 @@ public class VenueAreaDAO {
     // Check if an area exists by area_id
     public boolean existsArea(int areaId) {
         String sql = "SELECT 1 FROM Venue_Area WHERE area_id = ?";
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, areaId);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
         } catch (Exception e) {
@@ -156,8 +150,7 @@ public class VenueAreaDAO {
     // Update area - INCLUDES STATUS COLUMN (CRITICAL FIX)
     public boolean updateArea(int areaId, String areaName, String floor, int capacity, String status) {
         String sql = "UPDATE Venue_Area SET area_name = ?, floor = ?, capacity = ?, status = ? WHERE area_id = ?";
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setNString(1, areaName);
             ps.setNString(2, floor);
             ps.setInt(3, capacity);
@@ -175,8 +168,7 @@ public class VenueAreaDAO {
     // Soft delete: set status = 'UNAVAILABLE'
     public boolean softDeleteArea(int areaId) {
         String sql = "UPDATE Venue_Area SET status = N'UNAVAILABLE' WHERE area_id = ?";
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, areaId);
             int updated = ps.executeUpdate();
             return updated > 0;

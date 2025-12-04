@@ -3,6 +3,7 @@ package controller;
 import DAO.EventDAO;
 import DTO.EventDetailDto;
 import com.google.gson.Gson;
+import com.google.gson.GsonBuilder;   // ✅ IMPORT
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
@@ -14,7 +15,10 @@ import java.sql.SQLException;
 public class GetEventDetailController extends HttpServlet {
 
     private final EventDAO eventDAO = new EventDAO();
-    private final Gson gson = new Gson();
+    // ✅ Cho detail cũng serialize null để bannerUrl luôn có trong JSON
+    private final Gson gson = new GsonBuilder()
+            .serializeNulls()
+            .create();
 
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
@@ -22,11 +26,6 @@ public class GetEventDetailController extends HttpServlet {
         setCorsHeaders(response, request);
         response.setContentType("application/json;charset=UTF-8");
 
-        // Nếu bạn muốn cũng kiểm tra role giống GetAllEvents:
-        String role = (String) request.getAttribute("role");
-        // hoặc (tuỳ filter): String role = (String) request.getAttribute("jwt_role");
-
-        // TODO: có thể tái sử dụng isAllowedRole(role) giống controller list nếu cần
         String idParam = request.getParameter("id");
         if (idParam == null) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);

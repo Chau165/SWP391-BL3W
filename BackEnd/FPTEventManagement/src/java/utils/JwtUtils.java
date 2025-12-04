@@ -1,37 +1,38 @@
 package utils;
 
-import io.jsonwebtoken.Claims;
-import io.jsonwebtoken.ExpiredJwtException;
-import io.jsonwebtoken.JwtException;
-import io.jsonwebtoken.Jwts;
-import io.jsonwebtoken.MalformedJwtException;
-import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.UnsupportedJwtException;
-import io.jsonwebtoken.security.Keys;
-import io.jsonwebtoken.security.SecurityException;
-// import io.jsonwebtoken.SignatureException; // Bỏ import này nếu không dùng, hoặc giữ lại cũng không sao nhưng không catch nó
-
-import javax.crypto.SecretKey;
-import java.nio.charset.StandardCharsets;
+import io.jsonwebtoken.*;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * JWT helper utilities.
- * Uses a fixed hard-coded secret key so tokens remain valid across server restarts.
- */
 public class JwtUtils {
 
-    // ✅ FIXED SECRET KEY (Không đổi khi restart server)
-    // Chuỗi này phải đủ dài (ít nhất 32 ký tự)
-    private static final String SECRET = "MySuperSecretKeyForEventManagement2025_FixedKey";
-    private static final SecretKey SECRET_KEY = Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
+    // ===== DTO nhỏ để dùng trong code =====
+    public static class JwtUser {
+        private final int userId;
+        private final String email;
+        private final String role;
 
-    // Thời gian hết hạn (ví dụ: 24 giờ)
-    private static final long EXPIRATION = 86400000L; 
+        public JwtUser(int userId, String email, String role) {
+            this.userId = userId;
+            this.email = email;
+            this.role = role;
+        }
 
-    // 1. Tạo Token
+        public int getUserId() {
+            return userId;
+        }
+
+        public String getEmail() {
+            return email;
+        }
+
+        public String getRole() {
+            return role;
+        }
+    }
+
+    // ✅ Tạo token cho user
     public static String generateToken(String email, String role, int id) {
         Map<String, Object> claims = new HashMap<>();
         claims.put("role", role);
@@ -41,101 +42,116 @@ public class JwtUtils {
                 .setClaims(claims)
                 .setSubject(email)
                 .setIssuedAt(new Date(System.currentTimeMillis()))
-                .setExpiration(new Date(System.currentTimeMillis() + EXPIRATION))
-                .signWith(SECRET_KEY, SignatureAlgorithm.HS256)
+                .setExpiration(new Date(System.currentTimeMillis() + JwtConfig.EXPIRATION_TIME))
+                .signWith(JwtConfig.SECRET_KEY, SignatureAlgorithm.HS256)
                 .compact();
     }
 
-    // 2. Validate Token (Trả về True/False và in log lỗi)
+    // ✅ Hàm mới: parse token ra JwtUser (dùng cho controller)
+    public static JwtUser parseToken(String token) {
+        try {
+            Jws<Claims> jws = Jwts.parserBuilder()
+                    .setSigningKey(JwtConfig.SECRET_KEY)
+                    .build()
+                    .parseClaimsJws(token);
+
+            Claims claims = jws.getBody();
+
+            String email = claims.getSubject();
+            String role = null;
+            Object roleObj = claims.get("role");
+            if (roleObj != null) {
+                role = roleObj.toString();
+            }
+
+            Object idObj = claims.get("id");
+            Integer userId = null;
+            if (idObj instanceof Number) {
+                userId = ((Number) idObj).intValue();
+            } else if (idObj != null) {
+                try {
+                    userId = Integer.parseInt(idObj.toString());
+                } catch (NumberFormatException ignored) {}
+            }
+
+            if (email == null || role == null || userId == null) {
+                System.out.println("❌ JWT missing required claims (email/role/id)");
+                return null;
+            }
+
+            return new JwtUser(userId, email, role);
+
+        } catch (JwtException e) {
+            System.out.println("❌ JWT parse error: " + e.getMessage());
+            return null;
+        }
+    }
+
+    // ✅ Kiểm tra token hợp lệ (nếu chỗ khác còn dùng)
     public static boolean validateToken(String token) {
         try {
             Jwts.parserBuilder()
-                    .setSigningKey(SECRET_KEY)
+                    .setSigningKey(JwtConfig.SECRET_KEY)
                     .build()
                     .parseClaimsJws(token);
             return true;
-        } catch (ExpiredJwtException e) {
-            System.out.println("❌ JWT expired: " + e.getMessage());
-        } catch (UnsupportedJwtException e) {
-            System.out.println("❌ Unsupported JWT: " + e.getMessage());
-        } catch (MalformedJwtException e) {
-            System.out.println("❌ Malformed JWT: " + e.getMessage());
-        } catch (SecurityException e) { 
-            // Đã xóa SignatureException ở đây vì SecurityException bao trùm nó
-            System.out.println("❌ Invalid JWT signature: " + e.getMessage());
-        } catch (IllegalArgumentException e) {
-            System.out.println("❌ Illegal argument: " + e.getMessage());
         } catch (JwtException e) {
-            System.out.println("❌ General JWT error: " + e.getMessage());
-        }
-        return false;
-    }
-
-    // 3. Lấy chi tiết lỗi (Dùng cho Filter)
-    public static String getValidationError(String token) {
-        try {
-            Jwts.parserBuilder().setSigningKey(SECRET_KEY).build().parseClaimsJws(token);
-            return null; // Không lỗi
-        } catch (ExpiredJwtException e) {
-            return "ExpiredJwtException: " + e.getMessage();
-        } catch (UnsupportedJwtException e) {
-            return "UnsupportedJwtException: " + e.getMessage();
-        } catch (MalformedJwtException e) {
-            return "MalformedJwtException: " + e.getMessage();
-        } catch (SecurityException e) {
-            // Đã xóa SignatureException ở đây
-            return "SignatureException: " + e.getMessage();
-        } catch (IllegalArgumentException e) {
-            return "IllegalArgumentException: " + e.getMessage();
-        } catch (JwtException e) {
-            return "JwtException: " + e.getMessage();
+            System.out.println("❌ JWT validation error: " + e.getMessage());
+            return false;
         }
     }
 
-    // 4. Lấy Email từ Token
+    // ✅ Lấy email từ token (optional)
     public static String getEmailFromToken(String token) {
         try {
             return Jwts.parserBuilder()
-                    .setSigningKey(SECRET_KEY)
+                    .setSigningKey(JwtConfig.SECRET_KEY)
                     .build()
                     .parseClaimsJws(token)
                     .getBody()
                     .getSubject();
         } catch (Exception e) {
+            System.out.println("❌ Error getting email: " + e.getMessage());
             return null;
         }
     }
 
-    // 5. Lấy Role từ Token
+    // ✅ Lấy role từ token (optional)
     public static String getRoleFromToken(String token) {
         try {
             Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(SECRET_KEY)
+                    .setSigningKey(JwtConfig.SECRET_KEY)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
-            Object role = claims.get("role");
-            return role != null ? role.toString() : null;
+
+            Object roleObj = claims.get("role");
+            return roleObj != null ? roleObj.toString() : null;
         } catch (Exception e) {
+            System.out.println("❌ Error getting role: " + e.getMessage());
             return null;
         }
     }
 
-    // 6. Lấy ID từ Token
+    // ✅ Lấy ID user từ token (optional)
     public static Integer getIdFromToken(String token) {
         try {
             Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(SECRET_KEY)
+                    .setSigningKey(JwtConfig.SECRET_KEY)
                     .build()
                     .parseClaimsJws(token)
                     .getBody();
-            
+
             Object idObj = claims.get("id");
             if (idObj instanceof Number) {
                 return ((Number) idObj).intValue();
             }
+            if (idObj != null) {
+                return Integer.parseInt(idObj.toString());
+            }
             return null;
         } catch (Exception e) {
+            System.out.println("❌ Error getting id: " + e.getMessage());
             return null;
         }
     }

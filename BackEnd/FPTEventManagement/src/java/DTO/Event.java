@@ -8,6 +8,15 @@ public class Event {
     private String description;
     private Timestamp startTime;
     private Timestamp endTime;
+    private String bannerUrl;
+
+    public String getBannerUrl() {
+        return bannerUrl;
+    }
+
+    public void setBannerUrl(String bannerUrl) {
+        this.bannerUrl = bannerUrl;
+    }
 
     // private Integer venueId;   // ❌ bỏ
     private Integer areaId;       // ✅ mới

@@ -4,6 +4,7 @@ import java.sql.Timestamp;
 import java.util.List;
 
 public class EventDetailDto {
+
     private int eventId;
     private String title;
     private String description;
@@ -11,7 +12,15 @@ public class EventDetailDto {
     private Timestamp endTime;
     private int maxSeats;
     private String status;
+    private String bannerUrl;
 
+    public String getBannerUrl() {
+        return bannerUrl;
+    }
+
+    public void setBannerUrl(String bannerUrl) {
+        this.bannerUrl = bannerUrl;
+    }
     // Venue tổng
     private String venueName;      // từ Venue
 

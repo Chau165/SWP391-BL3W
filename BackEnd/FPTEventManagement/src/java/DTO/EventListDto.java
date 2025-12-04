@@ -14,12 +14,13 @@ public class EventListDto {
     private Timestamp endTime;
     private int maxSeats;
     private String status;
+    private String bannerUrl;
 
     public EventListDto() {}
 
     public EventListDto(int eventId, String title, String description,
                         Timestamp startTime, Timestamp endTime,
-                        int maxSeats, String status) {
+                        int maxSeats, String status, String bannerUrl) {
         this.eventId = eventId;
         this.title = title;
         this.description = description;
@@ -27,6 +28,15 @@ public class EventListDto {
         this.endTime = endTime;
         this.maxSeats = maxSeats;
         this.status = status;
+        this.bannerUrl = bannerUrl;
+    }
+
+    public String getBannerUrl() {
+        return bannerUrl;
+    }
+
+    public void setBannerUrl(String bannerUrl) {
+        this.bannerUrl = bannerUrl;
     }
 
     public int getEventId() {

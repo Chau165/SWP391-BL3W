@@ -36,4 +36,46 @@ public class CategoryTicketDAO {
         }
         return null;
     }
+    
+        // ================== THÊM MỚI: XÓA TOÀN BỘ CATEGORY_TICKET CỦA 1 EVENT ==================
+    public void deleteByEventId(Connection conn, int eventId) throws SQLException {
+        String sql = "DELETE FROM Category_Ticket WHERE event_id = ?";
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, eventId);
+            ps.executeUpdate();
+        }
+    }
+
+    // ================== THÊM MỚI: INSERT CATEGORY_TICKET CHO 1 EVENT ==================
+    public void insertCategoryTicket(Connection conn, CategoryTicket ct) throws SQLException {
+        String sql = "INSERT INTO Category_Ticket (event_id, name, description, price, max_quantity, status) "
+                   + "VALUES (?, ?, ?, ?, ?, ?)";
+
+        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, ct.getEventId());
+            ps.setNString(2, ct.getName());
+
+            if (ct.getDescription() != null) {
+                ps.setNString(3, ct.getDescription());
+            } else {
+                ps.setNull(3, Types.NVARCHAR);
+            }
+
+            if (ct.getPrice() != null) {
+                ps.setBigDecimal(4, ct.getPrice());
+            } else {
+                ps.setNull(4, Types.DECIMAL);
+            }
+
+            if (ct.getMaxQuantity() != null) {
+                ps.setInt(5, ct.getMaxQuantity());
+            } else {
+                ps.setNull(5, Types.INTEGER);
+            }
+
+            ps.setString(6, ct.getStatus() != null ? ct.getStatus() : "ACTIVE");
+
+            ps.executeUpdate();
+        }
+    }
 }
