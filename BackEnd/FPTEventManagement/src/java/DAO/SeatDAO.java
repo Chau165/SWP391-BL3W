@@ -154,4 +154,52 @@ public class SeatDAO {
             return false;
         }
     }
+
+    // Lấy danh sách ghế CÒN TRỐNG cho 1 event (theo eventId + areaId + optional seatType)
+    public List<Seat> getAvailableSeatsForEvent(int eventId, int areaId, String seatType) {
+        List<Seat> list = new ArrayList<>();
+
+        StringBuilder sql = new StringBuilder(
+                "SELECT s.seat_id, s.area_id, s.seat_code, s.row_no, s.col_no, s.status, s.seat_type "
+                + "FROM Seat s "
+                + "WHERE s.area_id = ? "
+                + "  AND s.status = 'ACTIVE' "
+                + // ghế vật lý còn dùng được
+                "  AND NOT EXISTS ( "
+                + "      SELECT 1 FROM Ticket t "
+                + "      WHERE t.event_id = ? "
+                + "        AND t.seat_id = s.seat_id "
+                + "        AND t.status IN ('BOOKED','CHECKED_IN') "
+                + "  ) "
+        );
+
+        // Nếu filter theo loại ghế (VIP / STANDARD)
+        boolean filterByType = (seatType != null && !seatType.trim().isEmpty());
+        if (filterByType) {
+            sql.append(" AND s.seat_type = ? ");
+        }
+
+        sql.append(" ORDER BY s.row_no, s.col_no ");
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+
+            ps.setInt(1, areaId);
+            ps.setInt(2, eventId);
+
+            if (filterByType) {
+                ps.setString(3, seatType.trim());
+            }
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    list.add(mapRowToSeat(rs));
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ERROR] getAvailableSeatsForEvent: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return list;
+    }
 }

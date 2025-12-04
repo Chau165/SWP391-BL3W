@@ -22,9 +22,9 @@ public class GetAllSeatsController extends HttpServlet {
         resp.setContentType("application/json;charset=UTF-8");
 
         try {
-            // 🔁 ĐỔI TÊN PARAM: areaId (thay vì venueId)
             String areaIdStr = req.getParameter("areaId");
-            String seatType = req.getParameter("seatType"); // có thể null
+            String seatType = req.getParameter("seatType"); // optional
+            String eventIdStr = req.getParameter("eventId");  // ⭐ THÊM
 
             if (areaIdStr == null) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -42,16 +42,32 @@ public class GetAllSeatsController extends HttpServlet {
             }
 
             List<Seat> seats;
-            if (seatType != null && !seatType.trim().isEmpty()) {
-                // ⚠️ seatDAO.getSeatsByVenueAndType hiện đang dùng tham số như areaId (đã sửa ở DAO)
-                seats = seatDAO.getSeatsByVenueAndType(areaId, seatType.trim());
+
+            if (eventIdStr != null && !eventIdStr.trim().isEmpty()) {
+                // 🎯 TRƯỜNG HỢP MUỐN LẤY GHẾ CÒN TRỐNG CHO 1 EVENT
+                int eventId;
+                try {
+                    eventId = Integer.parseInt(eventIdStr);
+                } catch (NumberFormatException e) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.getWriter().write("{\"error\":\"Invalid eventId\"}");
+                    return;
+                }
+
+                seats = seatDAO.getAvailableSeatsForEvent(eventId, areaId,
+                        (seatType != null && !seatType.trim().isEmpty()) ? seatType.trim() : null);
+
             } else {
-                seats = seatDAO.getSeatsByVenue(areaId);
+                // 🧱 TRƯỚC GIỜ: LẤY MỌI GHẾ TRONG AREA (KO QUAN TÂM EVENT)
+                if (seatType != null && !seatType.trim().isEmpty()) {
+                    seats = seatDAO.getSeatsByVenueAndType(areaId, seatType.trim());
+                } else {
+                    seats = seatDAO.getSeatsByVenue(areaId);
+                }
             }
 
-            // Gói lại một object để FE dễ xử lý
             SeatResponse seatResponse = new SeatResponse();
-            seatResponse.setAreaId(areaId);            // 🔁 đổi field
+            seatResponse.setAreaId(areaId);
             seatResponse.setSeatType(seatType);
             seatResponse.setTotal(seats != null ? seats.size() : 0);
             seatResponse.setSeats(seats);
