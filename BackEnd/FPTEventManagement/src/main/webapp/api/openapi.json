@@ -368,8 +368,7 @@
           "floor": { "type": "string", "example": "string" },
           "capacity": { "type": "integer", "example": 0 }
         }
-      }
-      ,
+      },
       "VenueAreaUpdateRequest": {
         "type": "object",
         "required": ["areaId", "areaName", "capacity"],
