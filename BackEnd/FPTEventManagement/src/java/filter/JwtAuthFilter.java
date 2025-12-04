@@ -57,6 +57,11 @@ public class JwtAuthFilter implements Filter {
             path = path.substring(ctx.length());
         }
 
+        // Allow public GET for listing venues
+        if (path.equals("/api/venues") && "GET".equalsIgnoreCase(req.getMethod())) {
+            return true;
+        }
+
         // Các API không cần JWT (đăng nhập / đăng ký / forgot pass)
         if (path.equals("/api/login")) {
             return true;
@@ -131,19 +136,34 @@ public class JwtAuthFilter implements Filter {
         String auth = req.getHeader("Authorization");
         System.out.println("🔹 Authorization header: " + auth);
 
-        if (auth == null || !auth.startsWith("Bearer ")) {
-            System.out.println("❌ Missing or invalid Authorization header");
+        if (auth == null || auth.trim().isEmpty()) {
+            System.out.println("❌ Missing Authorization header");
             writeJson(resp, HttpServletResponse.SC_UNAUTHORIZED,
                     "{\"error\":\"Missing token\"}");
             return;
         }
 
-        String token = auth.substring(7).trim();
-        System.out.println("🔹 Token prefix: "
-                + token.substring(0, Math.min(20, token.length())) + "...");
+        // Support case-insensitive 'Bearer ' prefix and also bare token
+        String token;
+        String authLower = auth.toLowerCase();
+        if (authLower.startsWith("bearer ")) {
+            token = auth.substring(auth.indexOf(' ') + 1).trim();
+        } else {
+            token = auth.trim();
+        }
+
+        if (token.isEmpty()) {
+            System.out.println("❌ Authorization header provided but token is empty");
+            writeJson(resp, HttpServletResponse.SC_UNAUTHORIZED,
+                    "{\"error\":\"Missing token\"}");
+            return;
+        }
+
+        System.out.println("🔹 Token preview: " + (token.length() > 20 ? token.substring(0, 20) + "..." : token));
 
         if (!JwtUtils.validateToken(token)) {
-            System.out.println("❌ Token validation failed");
+            String reason = JwtUtils.getValidationError(token);
+            System.out.println("❌ Token validation failed. Reason: " + (reason == null ? "unknown" : reason));
             writeJson(resp, HttpServletResponse.SC_UNAUTHORIZED,
                     "{\"error\":\"Invalid or expired token\"}");
             return;
