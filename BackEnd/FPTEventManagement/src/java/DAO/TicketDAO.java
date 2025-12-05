@@ -9,6 +9,9 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
 import mylib.DBUtils;
+import DTO.MyTicketResponse;
+import java.util.ArrayList;
+import java.util.List;
 
 public class TicketDAO {
 
@@ -207,6 +210,44 @@ public class TicketDAO {
             e.printStackTrace();
             return false;
         }
+    }
+
+    // New: Lấy danh sách vé (kèm thông tin Event + Venue) theo user_id
+    public List<MyTicketResponse> getTicketsByUserId(int userId) {
+        String sql = "SELECT t.ticket_id, t.qr_code_value, t.status, t.checkin_time, "
+                + " e.title AS event_name, e.start_time AS start_time, v.venue_name AS venue_name "
+                + "FROM Ticket t "
+                + "JOIN Event e ON t.event_id = e.event_id "
+                + "LEFT JOIN Venue_Area va ON e.area_id = va.area_id "
+                + "LEFT JOIN Venue v ON va.venue_id = v.venue_id "
+                + "WHERE t.user_id = ? "
+                + "ORDER BY t.qr_issued_at DESC";
+
+        List<MyTicketResponse> result = new ArrayList<>();
+
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    MyTicketResponse m = new MyTicketResponse();
+                    m.setTicketId(rs.getInt("ticket_id"));
+                    m.setTicketCode(rs.getString("qr_code_value"));
+                    m.setStatus(rs.getString("status"));
+                    m.setCheckInTime(rs.getTimestamp("checkin_time"));
+                    m.setEventName(rs.getString("event_name"));
+                    m.setStartTime(rs.getTimestamp("start_time"));
+                    String venue = rs.getString("venue_name");
+                    m.setVenueName(venue); // can be null
+                    result.add(m);
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ERROR] getTicketsByUserId: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return result;
     }
 }
 

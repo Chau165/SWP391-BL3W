@@ -861,6 +861,40 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}"
                 + "}"
                 + "}";
+        // ===== API: /api/registrations/my-tickets (Student History) =====
+        String myTicketsPath
+                = "\"/api/registrations/my-tickets\":{"
+                + "\"get\":{"
+                + "\"summary\":\"[Student] Xem lịch sử vé đã đăng ký\","
+                + "\"description\":\"Lấy danh sách vé của user đang đăng nhập (kèm thông tin sự kiện, địa điểm)\","
+                + "\"security\":[{\"bearerAuth\":[]}],"
+                + "\"responses\":{"
+                + "  \"200\":{"
+                + "    \"description\":\"Danh sách vé\","
+                + "    \"content\":{"
+                + "      \"application/json\":{"
+                + "        \"schema\":{"
+                + "          \"type\":\"array\","
+                + "          \"items\":{"
+                + "            \"type\":\"object\","
+                + "            \"properties\":{"
+                + "              \"ticketId\":{\"type\":\"integer\", \"example\": 1},"
+                + "              \"ticketCode\":{\"type\":\"string\", \"example\": \"QR-123456\"},"
+                + "              \"eventName\":{\"type\":\"string\", \"example\": \"Talkshow AI\"},"
+                + "              \"venueName\":{\"type\":\"string\", \"example\": \"Hội trường A\"},"
+                + "              \"startTime\":{\"type\":\"string\", \"format\":\"date-time\"},"
+                + "              \"status\":{\"type\":\"string\", \"example\": \"BOOKED\"},"
+                + "              \"checkInTime\":{\"type\":\"string\", \"format\":\"date-time\"}"
+                + "            }"
+                + "          }"
+                + "        }"
+                + "      }"
+                + "    }"
+                + "  },"
+                + "  \"401\":{\"description\":\"Chưa đăng nhập\"}"
+                + "}"
+                + "}"
+                + "}";
 
         // ================================
         // ========== GHÉP JSON ===========
@@ -895,7 +929,8 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + freeAreasPath + ","
                 + buyTicketPath + ","
                 + venuesPath + ","
-                + venueAreasPath
+                + venueAreasPath + "," // Nhớ đảm bảo dòng trước đó có dấu phẩy
+                + myTicketsPath // <--- CHÈN VÀO ĐÂY
                 + "},"
                 + "\"components\":{"
                 + "\"securitySchemes\":{"
