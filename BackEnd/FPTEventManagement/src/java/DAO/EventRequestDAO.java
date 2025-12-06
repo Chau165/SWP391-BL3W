@@ -378,27 +378,42 @@ public class EventRequestDAO {
     }
 
     // ======================= THÊM MỚI: LẤY REQUEST THEO created_event_id =======================
-    public EventRequest getByCreatedEventId(int eventId) {
-        String sql = "SELECT request_id, requester_id, title, description, "
-                + "preferred_start_time, preferred_end_time, expected_capacity, "
-                + "status, created_at, processed_by, processed_at, organizer_note, created_event_id "
-                + "FROM Event_Request WHERE created_event_id = ?";
+public EventRequest getByCreatedEventId(int eventId) {
+    String sql = "SELECT " +
+            "er.request_id, " +
+            "er.requester_id, " +
+            "er.title, " +
+            "er.description, " +
+            "er.preferred_start_time, " +
+            "er.preferred_end_time, " +
+            "er.expected_capacity, " +
+            "er.status, " +
+            "er.created_at, " +
+            "er.processed_by, " +
+            "er.processed_at, " +
+            "er.organizer_note, " +
+            "er.created_event_id, " +
+            "u.full_name AS requester_name " +   // ✅ lấy tên người gửi
+            "FROM Event_Request er " +
+            "JOIN Users u ON er.requester_id = u.user_id " + // ✅ đúng tên bảng: Users
+            "WHERE er.created_event_id = ?";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+    try (Connection conn = DBUtils.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setInt(1, eventId);
+        ps.setInt(1, eventId);
 
-            try ( ResultSet rs = ps.executeQuery()) {
-                if (rs.next()) {
-                    return mapRow(rs);
-                }
+        try (ResultSet rs = ps.executeQuery()) {
+            if (rs.next()) {
+                return mapRow(rs);
             }
-        } catch (Exception e) {
-            System.err.println("[ERROR] getByCreatedEventId: " + e.getMessage());
-            e.printStackTrace();
         }
-        return null;
+    } catch (Exception e) {
+        System.err.println("[ERROR] getByCreatedEventId: " + e.getMessage());
+        e.printStackTrace();
     }
+    return null;
+}
 
     // ======================= MAP ROW =======================
     private EventRequest mapRow(ResultSet rs) throws SQLException {

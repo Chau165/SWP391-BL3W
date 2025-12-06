@@ -10,7 +10,7 @@ import jakarta.servlet.http.*;
 import java.io.*;
 import java.util.List;
 
-@WebServlet("/api/organizer/event-requests")
+@WebServlet("/api/staff/event-requests")
 public class GetPendingEventRequestsController extends HttpServlet {
 
     private final EventRequestDAO eventRequestDAO = new EventRequestDAO();

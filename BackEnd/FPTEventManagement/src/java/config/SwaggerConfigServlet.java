@@ -548,9 +548,9 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}"
                 + "}";
 
-        // 3) STAFF xem tất cả request PENDING: GET /api/organizer/event-requests
+        // 3) STAFF xem tất cả request PENDING: GET /api/staff/event-requests
         String organizerEventRequestsPath
-                = "\"/api/organizer/event-requests\":{"
+                = "\"/api/staff/event-requests\":{"
                 + "\"get\":{"
                 + "\"summary\":\"Staff xem tất cả request sự kiện đang PENDING\","
                 + "\"description\":\"Chỉ STAFF (hoặc ADMIN nếu hệ thống cho phép). Trả về toàn bộ Event_Request có status = PENDING để Staff xem và chuẩn bị xử lý.\","

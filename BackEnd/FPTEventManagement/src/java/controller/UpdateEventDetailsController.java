@@ -4,6 +4,7 @@ import DAO.EventDAO;
 import DAO.EventRequestDAO;
 import DAO.SpeakerDAO;
 import DAO.CategoryTicketDAO;
+import DAO.SeatDAO; // ✅ thêm import
 
 import DTO.Event;
 import DTO.EventRequest;
@@ -24,7 +25,6 @@ import java.math.BigDecimal;
 import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.List;
-import java.util.ArrayList;
 
 @WebServlet("/api/events/update-details")
 public class UpdateEventDetailsController extends HttpServlet {
@@ -34,10 +34,10 @@ public class UpdateEventDetailsController extends HttpServlet {
     private final EventRequestDAO eventRequestDAO = new EventRequestDAO();
     private final SpeakerDAO speakerDAO = new SpeakerDAO();
     private final CategoryTicketDAO categoryTicketDAO = new CategoryTicketDAO();
+    private final SeatDAO seatDAO = new SeatDAO(); // ✅ dùng để reconfig ghế
 
     // ====== DTO cho request body ======
     private static class UpdateEventDetailsRequest {
-
         Integer eventId;
         SpeakerDTO speaker;
         List<TicketDTO> tickets;
@@ -45,7 +45,6 @@ public class UpdateEventDetailsController extends HttpServlet {
     }
 
     private static class SpeakerDTO {
-
         String fullName;
         String bio;
         String email;
@@ -54,7 +53,6 @@ public class UpdateEventDetailsController extends HttpServlet {
     }
 
     private static class TicketDTO {
-
         String name;
         String description;
         BigDecimal price;
@@ -68,8 +66,22 @@ public class UpdateEventDetailsController extends HttpServlet {
         resp.setStatus(HttpServletResponse.SC_OK);
     }
 
+    // ✅ Dùng POST để update
+    @Override
+    protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        handleUpdate(req, resp);
+    }
+
+    // (Optional) Nếu muốn vẫn hỗ trợ PUT thì giữ lại, còn không thì có thể xoá
+    /*
     @Override
     protected void doPut(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+        handleUpdate(req, resp);
+    }
+    */
+
+    // ====== Toàn bộ logic update nằm ở đây ======
+    private void handleUpdate(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         setCorsHeaders(resp, req);
         req.setCharacterEncoding("UTF-8");
         resp.setContentType("application/json;charset=UTF-8");
@@ -98,13 +110,13 @@ public class UpdateEventDetailsController extends HttpServlet {
 
             if (!"ORGANIZER".equalsIgnoreCase(role)) {
                 resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                out.write("{\"error\":\"Only STUDENT can update event details\"}");
+                out.write("{\"error\":\"Only Organizer can update event details\"}");
                 return;
             }
 
             // 2. Đọc JSON body
             StringBuilder sb = new StringBuilder();
-            try ( BufferedReader reader = req.getReader()) {
+            try (BufferedReader reader = req.getReader()) {
                 String line;
                 while ((line = reader.readLine()) != null) {
                     sb.append(line);
@@ -151,6 +163,11 @@ public class UpdateEventDetailsController extends HttpServlet {
             }
 
             int sumQuantity = 0;
+
+            // ✅ Đếm số ghế VIP / STANDARD để lát nữa reconfig Seat
+            int vipCount = 0;
+            int standardCount = 0;
+
             for (TicketDTO t : body.tickets) {
                 if (t.maxQuantity == null || t.maxQuantity <= 0) {
                     resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
@@ -158,6 +175,14 @@ public class UpdateEventDetailsController extends HttpServlet {
                     return;
                 }
                 sumQuantity += t.maxQuantity;
+
+                // Quy ước đơn giản: name chứa "VIP" → ghế VIP, còn lại STANDARD
+                String typeName = (t.name != null) ? t.name.trim().toUpperCase() : "";
+                if (typeName.contains("VIP")) {
+                    vipCount += t.maxQuantity;
+                } else {
+                    standardCount += t.maxQuantity;
+                }
             }
 
             if (sumQuantity > event.getMaxSeats()) {
@@ -190,15 +215,15 @@ public class UpdateEventDetailsController extends HttpServlet {
                     eventDAO.updateSpeakerForEvent(conn, body.eventId, speakerId);
                 }
 
-// ✅ 7.3 Cập nhật banner_url (nếu có gửi lên)
+                // ✅ 7.3 Cập nhật banner_url (nếu có gửi lên)
                 if (body.bannerUrl != null) {
                     eventDAO.updateBannerUrlForEvent(conn, body.eventId, body.bannerUrl);
                 }
 
-// 7.4 Xóa các Category_Ticket cũ của event
+                // 7.4 Xóa các Category_Ticket cũ của event
                 categoryTicketDAO.deleteByEventId(conn, body.eventId);
 
-// 7.5 Insert lại Category_Ticket mới
+                // 7.5 Insert lại Category_Ticket mới
                 for (TicketDTO t : body.tickets) {
                     CategoryTicket ct = new CategoryTicket();
                     ct.setEventId(body.eventId);
@@ -211,7 +236,17 @@ public class UpdateEventDetailsController extends HttpServlet {
                     categoryTicketDAO.insertCategoryTicket(conn, ct);
                 }
 
-// 7.6 Sau khi có đầy đủ Speaker + Ticket, chuyển trạng thái event sang OPEN
+                // 🔥 7.5b: Re-config lại ghế vật lý cho area của event
+                // NOTE: chỉnh lại getter cho đúng schema của bạn
+                int areaId = event.getAreaId(); // nếu bạn dùng field khác (vd: getVenueAreaId) thì sửa ở đây
+
+                // Sẽ:
+                // - set N ghế đầu → VIP / ACTIVE
+                // - tiếp theo → STANDARD / ACTIVE
+                // - ghế dư → INACTIVE
+                seatDAO.reconfigureSeatsForArea(conn, areaId, vipCount, standardCount);
+
+                // 7.6 Sau khi có đầy đủ Speaker + Ticket + Seat, chuyển trạng thái event sang OPEN
                 boolean updatedStatus = eventDAO.updateEventStatus(conn, body.eventId, "OPEN");
                 if (!updatedStatus) {
                     throw new RuntimeException("Failed to update event status to OPEN");
@@ -230,8 +265,16 @@ public class UpdateEventDetailsController extends HttpServlet {
                     }
                 }
                 e.printStackTrace();
-                resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-                out.write("{\"error\":\"Internal server error\"}");
+
+                // Optional: nếu lỗi do thiếu ghế vật lý, bạn có thể trả 400 thay vì 500
+                String msg = e.getMessage();
+                if (msg != null && msg.startsWith("Not enough physical seats")) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    out.write("{\"error\":\"" + msg + "\"}");
+                } else {
+                    resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                    out.write("{\"error\":\"Internal server error\"}");
+                }
             } finally {
                 if (conn != null) {
                     try {
@@ -267,6 +310,7 @@ public class UpdateEventDetailsController extends HttpServlet {
         }
 
         res.setHeader("Vary", "Origin");
+        // Ở đây POST là đủ (nếu không dùng PUT nữa)
         res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         res.setHeader("Access-Control-Allow-Headers",
                 "Content-Type, Authorization, ngrok-skip-browser-warning");

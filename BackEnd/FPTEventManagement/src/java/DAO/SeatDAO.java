@@ -202,4 +202,69 @@ public class SeatDAO {
 
         return list;
     }
+
+    public void reconfigureSeatsForArea(Connection conn, int areaId, int vipCount, int standardCount) throws SQLException {
+        int totalNeeded = vipCount + standardCount;
+
+        // 1. Lấy toàn bộ seat_id cho area này (giữ layout theo row/col)
+        List<Integer> seatIds = new ArrayList<>();
+
+        String selectSql = "SELECT seat_id "
+                + "FROM Seat "
+                + "WHERE area_id = ? "
+                + "ORDER BY row_no, col_no";
+
+        try ( PreparedStatement ps = conn.prepareStatement(selectSql)) {
+            ps.setInt(1, areaId);
+            try ( ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    seatIds.add(rs.getInt("seat_id"));
+                }
+            }
+        }
+
+        if (seatIds.size() < totalNeeded) {
+            throw new RuntimeException(
+                    "Not enough physical seats in area_id=" + areaId
+                    + " | seats in DB=" + seatIds.size()
+                    + " < required=" + totalNeeded
+            );
+        }
+
+        // 2. Cập nhật lại seat_type + status
+        String updateSql = "UPDATE Seat SET seat_type = ?, status = ? WHERE seat_id = ?";
+
+        try ( PreparedStatement psUpdate = conn.prepareStatement(updateSql)) {
+
+            int index = 0;
+            for (Integer seatId : seatIds) {
+                String seatType;
+                String status;
+
+                if (index < totalNeeded) {
+                    // ghế nằm trong quota sử dụng
+                    status = "ACTIVE";
+
+                    if (index < vipCount) {
+                        seatType = "VIP";
+                    } else {
+                        seatType = "STANDARD";
+                    }
+                } else {
+                    // ghế dư, tạm inactive để không dùng
+                    seatType = "STANDARD"; // hoặc giữ nguyên, tùy bạn
+                    status = "INACTIVE";
+                }
+
+                psUpdate.setString(1, seatType);
+                psUpdate.setString(2, status);
+                psUpdate.setInt(3, seatId);
+                psUpdate.addBatch();
+
+                index++;
+            }
+
+            psUpdate.executeBatch();
+        }
+    }
 }
