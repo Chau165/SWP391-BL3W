@@ -16,8 +16,7 @@ public class EventRequestDAO {
                 + "preferred_end_time, expected_capacity, status"
                 + ") VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, r.getRequesterId());
             ps.setNString(2, r.getTitle());
@@ -52,7 +51,7 @@ public class EventRequestDAO {
                 return null;
             }
 
-            try (ResultSet rs = ps.getGeneratedKeys()) {
+            try ( ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     return rs.getInt(1);
                 }
@@ -64,19 +63,23 @@ public class EventRequestDAO {
         return null;
     }
 
-    // Lấy tất cả request của 1 student (theo requester_id)
     public List<EventRequest> getRequestsByStudent(int requesterId) {
         List<EventRequest> list = new ArrayList<>();
-        String sql = "SELECT request_id, requester_id, title, description, "
-                + "preferred_start_time, preferred_end_time, expected_capacity, "
-                + "status, created_at, processed_by, processed_at, organizer_note, created_event_id "
-                + "FROM Event_Request WHERE requester_id = ? ORDER BY created_at DESC";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        String sql
+                = "SELECT er.request_id, er.requester_id, u.full_name AS requester_name, "
+                + "       er.title, er.description, er.preferred_start_time, er.preferred_end_time, "
+                + "       er.expected_capacity, er.status, er.created_at, er.processed_by, "
+                + "       er.processed_at, er.organizer_note, er.created_event_id "
+                + "FROM Event_Request er "
+                + "JOIN Users u ON er.requester_id = u.user_id "
+                + "WHERE er.requester_id = ? "
+                + "ORDER BY er.created_at DESC";
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, requesterId);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     list.add(mapRow(rs));
                 }
@@ -91,14 +94,17 @@ public class EventRequestDAO {
     // Lấy tất cả request đang PENDING cho ORGANIZER xem
     public List<EventRequest> getPendingRequests() {
         List<EventRequest> list = new ArrayList<>();
-        String sql = "SELECT request_id, requester_id, title, description, "
-                + "preferred_start_time, preferred_end_time, expected_capacity, "
-                + "status, created_at, processed_by, processed_at, organizer_note, created_event_id "
-                + "FROM Event_Request WHERE status = 'PENDING' ORDER BY created_at ASC";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql);
-             ResultSet rs = ps.executeQuery()) {
+        String sql = "SELECT er.request_id, er.requester_id, u.full_name AS requester_name, "
+                + "er.title, er.description, er.preferred_start_time, er.preferred_end_time, "
+                + "er.expected_capacity, er.status, er.created_at, er.processed_by, "
+                + "er.processed_at, er.organizer_note, er.created_event_id "
+                + "FROM Event_Request er "
+                + "JOIN Users u ON er.requester_id = u.user_id "
+                + "WHERE er.status = 'PENDING' "
+                + "ORDER BY er.created_at ASC";
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql);  ResultSet rs = ps.executeQuery()) {
 
             while (rs.next()) {
                 list.add(mapRow(rs));
@@ -112,16 +118,19 @@ public class EventRequestDAO {
 
     // ======================= GET BY ID =======================
     public EventRequest getById(int requestId) {
-        String sql = "SELECT request_id, requester_id, title, description, "
-                + "preferred_start_time, preferred_end_time, expected_capacity, "
-                + "status, created_at, processed_by, processed_at, organizer_note, created_event_id "
-                + "FROM Event_Request WHERE request_id = ?";
+        String sql
+                = "SELECT er.request_id, er.requester_id, u.full_name AS requester_name, "
+                + "       er.title, er.description, er.preferred_start_time, er.preferred_end_time, "
+                + "       er.expected_capacity, er.status, er.created_at, er.processed_by, "
+                + "       er.processed_at, er.organizer_note, er.created_event_id "
+                + "FROM Event_Request er "
+                + "JOIN Users u ON er.requester_id = u.user_id "
+                + "WHERE er.request_id = ?";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, requestId);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return mapRow(rs);
                 }
@@ -135,39 +144,36 @@ public class EventRequestDAO {
 
     // ======================= CHECK TRÙNG LỊCH AREA (CÓ BUFFER 1H) =======================
     /**
-     * Rule:
-     *  - Giữa 2 event cùng 1 Area phải cách nhau ít nhất 1h (cả trước & sau).
-     *  - Khi check khoảng [startTime, endTime] của request mới:
-     *      newStartBuffer = startTime - 1h
-     *      newEndBuffer   = endTime   + 1h
-     *    => Nếu tồn tại event cũ thỏa:
-     *       existing.start_time < newEndBuffer
-     *       AND existing.end_time > newStartBuffer
-     *       => COI LÀ TRÙNG (conflict = true)
+     * Rule: - Giữa 2 event cùng 1 Area phải cách nhau ít nhất 1h (cả trước &
+     * sau). - Khi check khoảng [startTime, endTime] của request mới:
+     * newStartBuffer = startTime - 1h newEndBuffer = endTime + 1h => Nếu tồn
+     * tại event cũ thỏa: existing.start_time < newEndBuffer
+     *       AND existing.end_time > newStartBuffer => COI LÀ TRÙNG (conflict = true)
      */
     public boolean hasAreaConflict(int areaId, Timestamp startTime, Timestamp endTime) {
-        if (startTime == null || endTime == null) return false;
+        if (startTime == null || endTime == null) {
+            return false;
+        }
 
         long ONE_HOUR_MS = 60L * 60L * 1000L;
 
         Timestamp startBuffer = new Timestamp(startTime.getTime() - ONE_HOUR_MS);
-        Timestamp endBuffer   = new Timestamp(endTime.getTime() + ONE_HOUR_MS);
+        Timestamp endBuffer = new Timestamp(endTime.getTime() + ONE_HOUR_MS);
 
         String sql = "SELECT COUNT(*) AS cnt "
                 + "FROM Event "
                 + "WHERE area_id = ? "
                 + "  AND status IN ('OPEN','CLOSED','DRAFT') "
-                + "  AND start_time < ? "   // existing.start < newEndBuffer
+                + "  AND start_time < ? " // existing.start < newEndBuffer
                 + "  AND end_time   > ?";   // existing.end > newStartBuffer
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, areaId);
             ps.setTimestamp(2, endBuffer);
             ps.setTimestamp(3, startBuffer);
 
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     int cnt = rs.getInt("cnt");
                     return (cnt > 0);
@@ -184,11 +190,10 @@ public class EventRequestDAO {
     public Integer getAreaCapacity(int areaId) {
         String sql = "SELECT capacity FROM Venue_Area WHERE area_id = ?";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, areaId);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt("capacity");
                 }
@@ -202,9 +207,9 @@ public class EventRequestDAO {
 
     // ======================= APPROVE + TẠO EVENT (TRONG TRANSACTION) =======================
     public Integer approveRequestAndCreateEvent(EventRequest req,
-                                                int organizerId,
-                                                int areaId,
-                                                String organizerNote) {
+            int organizerId,
+            int areaId,
+            String organizerNote) {
         Connection conn = null;
         PreparedStatement psInsertEvent = null;
         PreparedStatement psUpdateRequest = null;
@@ -303,29 +308,39 @@ public class EventRequestDAO {
             }
         } finally {
             try {
-                if (rsKeys != null) rsKeys.close();
-            } catch (Exception ignore) {}
+                if (rsKeys != null) {
+                    rsKeys.close();
+                }
+            } catch (Exception ignore) {
+            }
             try {
-                if (psInsertEvent != null) psInsertEvent.close();
-            } catch (Exception ignore) {}
+                if (psInsertEvent != null) {
+                    psInsertEvent.close();
+                }
+            } catch (Exception ignore) {
+            }
             try {
-                if (psUpdateRequest != null) psUpdateRequest.close();
-            } catch (Exception ignore) {}
+                if (psUpdateRequest != null) {
+                    psUpdateRequest.close();
+                }
+            } catch (Exception ignore) {
+            }
             try {
                 if (conn != null) {
                     conn.setAutoCommit(true);
                     conn.close();
                 }
-            } catch (Exception ignore) {}
+            } catch (Exception ignore) {
+            }
         }
         return null;
     }
 
     private Integer getAreaCapacityInsideTx(Connection conn, int areaId) throws SQLException {
         String sql = "SELECT capacity FROM Venue_Area WHERE area_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, areaId);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt("capacity");
                 }
@@ -343,8 +358,7 @@ public class EventRequestDAO {
                 + "    organizer_note = ? "
                 + "WHERE request_id = ? AND status = 'PENDING'";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, organizerId);
             if (organizerNote != null) {
@@ -362,20 +376,19 @@ public class EventRequestDAO {
         }
         return false;
     }
-    
-      // ======================= THÊM MỚI: LẤY REQUEST THEO created_event_id =======================
+
+    // ======================= THÊM MỚI: LẤY REQUEST THEO created_event_id =======================
     public EventRequest getByCreatedEventId(int eventId) {
         String sql = "SELECT request_id, requester_id, title, description, "
                 + "preferred_start_time, preferred_end_time, expected_capacity, "
                 + "status, created_at, processed_by, processed_at, organizer_note, created_event_id "
                 + "FROM Event_Request WHERE created_event_id = ?";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, eventId);
 
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return mapRow(rs);
                 }
@@ -389,26 +402,25 @@ public class EventRequestDAO {
 
     // ======================= MAP ROW =======================
     private EventRequest mapRow(ResultSet rs) throws SQLException {
-        EventRequest r = new EventRequest();
-        r.setRequestId(rs.getInt("request_id"));
-        r.setRequesterId(rs.getInt("requester_id"));
-        r.setTitle(rs.getNString("title"));
-        r.setDescription(rs.getNString("description"));
-        r.setPreferredStartTime(rs.getTimestamp("preferred_start_time"));
-        r.setPreferredEndTime(rs.getTimestamp("preferred_end_time"));
-        int cap = rs.getInt("expected_capacity");
-        r.setExpectedCapacity(rs.wasNull() ? null : cap);
-        r.setStatus(rs.getNString("status"));
-        r.setCreatedAt(rs.getTimestamp("created_at"));
+        EventRequest er = new EventRequest();
+        er.setRequestId(rs.getInt("request_id"));
+        er.setRequesterId(rs.getInt("requester_id"));
 
-        int pb = rs.getInt("processed_by");
-        r.setProcessedBy(rs.wasNull() ? null : pb);
-        r.setProcessedAt(rs.getTimestamp("processed_at"));
-        r.setOrganizerNote(rs.getNString("organizer_note"));
+        // ✅ set thêm tên người gửi
+        er.setRequesterName(rs.getString("requester_name"));
 
-        int evId = rs.getInt("created_event_id");
-        r.setCreatedEventId(rs.wasNull() ? null : evId);
-
-        return r;
+        er.setTitle(rs.getString("title"));
+        er.setDescription(rs.getString("description"));
+        er.setPreferredStartTime(rs.getTimestamp("preferred_start_time"));
+        er.setPreferredEndTime(rs.getTimestamp("preferred_end_time"));
+        er.setExpectedCapacity((Integer) rs.getObject("expected_capacity"));
+        er.setStatus(rs.getString("status"));
+        er.setCreatedAt(rs.getTimestamp("created_at"));
+        er.setProcessedBy((Integer) rs.getObject("processed_by"));
+        er.setProcessedAt(rs.getTimestamp("processed_at"));
+        er.setOrganizerNote(rs.getString("organizer_note"));
+        er.setCreatedEventId((Integer) rs.getObject("created_event_id"));
+        return er;
     }
+
 }

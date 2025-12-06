@@ -113,11 +113,11 @@ public class VenueAreaController extends HttpServlet {
             return;
         }
         String role = JwtUtils.getRoleFromToken(token);
-        if (role == null || !"ADMIN".equalsIgnoreCase(role)) {
+        if (role == null || !"STAFF".equalsIgnoreCase(role)) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
             Map<String, Object> m = new HashMap<>();
             m.put("status", "fail");
-            m.put("message", "ADMIN role required");
+            m.put("message", "STAFF role required");
             out.print(gson.toJson(m));
             return;
         }

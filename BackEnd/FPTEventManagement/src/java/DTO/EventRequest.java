@@ -5,6 +5,7 @@ import java.sql.Timestamp;
 public class EventRequest {
     private Integer requestId;
     private Integer requesterId;
+    private String requesterName;   // ✅ THÊM MỚI
     private String title;
     private String description;
     private Timestamp preferredStartTime;
@@ -17,12 +18,15 @@ public class EventRequest {
     private String organizerNote;
     private Integer createdEventId;
 
-    // Getters & Setters
     public Integer getRequestId() { return requestId; }
     public void setRequestId(Integer requestId) { this.requestId = requestId; }
 
     public Integer getRequesterId() { return requesterId; }
     public void setRequesterId(Integer requesterId) { this.requesterId = requesterId; }
+
+    // ✅ getter/setter mới
+    public String getRequesterName() { return requesterName; }
+    public void setRequesterName(String requesterName) { this.requesterName = requesterName; }
 
     public String getTitle() { return title; }
     public void setTitle(String title) { this.title = title; }

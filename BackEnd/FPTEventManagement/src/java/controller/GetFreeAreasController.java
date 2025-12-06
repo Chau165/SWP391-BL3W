@@ -52,7 +52,7 @@ public class GetFreeAreasController extends HttpServlet {
 
         String role = JwtUtils.getRoleFromToken(token);
         if (role == null ||
-                !( "ORGANIZER".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role) )) {
+                !( "STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role) )) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
             out.print("{\"status\":\"fail\",\"message\":\"Chỉ ORGANIZER hoặc ADMIN mới được xem area trống\"}");
             return;

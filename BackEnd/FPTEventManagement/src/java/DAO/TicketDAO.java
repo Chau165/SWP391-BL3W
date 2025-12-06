@@ -1,5 +1,6 @@
 package DAO;
 
+import DTO.MyTicketResponse;
 import DTO.Ticket;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
@@ -8,10 +9,9 @@ import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
-import mylib.DBUtils;
-import DTO.MyTicketResponse;
 import java.util.ArrayList;
 import java.util.List;
+import mylib.DBUtils;
 
 public class TicketDAO {
 
@@ -211,8 +211,8 @@ public class TicketDAO {
             return false;
         }
     }
-
-    // New: Lấy danh sách vé (kèm thông tin Event + Venue) theo user_id
+    
+        // New: Lấy danh sách vé (kèm thông tin Event + Venue) theo user_id
     public List<MyTicketResponse> getTicketsByUserId(int userId) {
         String sql = "SELECT t.ticket_id, t.qr_code_value, t.status, t.checkin_time, "
                 + " e.title AS event_name, e.start_time AS start_time, v.venue_name AS venue_name "

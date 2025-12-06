@@ -491,12 +491,12 @@ public class SwaggerConfigServlet extends HttpServlet {
         // ============================
         // ===== EVENT REQUEST API =====
         // ============================
-        // 1) STUDENT tạo request: POST /api/event-requests
+        // 1) TẠO REQUEST SỰ KIỆN: POST /api/event-requests (ORGANIZER)
         String eventRequestCreatePath
                 = "\"/api/event-requests\":{"
                 + "\"post\":{"
-                + "\"summary\":\"Student tạo request đề xuất sự kiện\","
-                + "\"description\":\"Chỉ STUDENT mới được gọi API này. Tạo 1 Event_Request với status = PENDING\","
+                + "\"summary\":\"Organizer tạo request đề xuất sự kiện\","
+                + "\"description\":\"Chỉ ORGANIZER mới được gọi API này. Tạo một Event_Request với status = PENDING cho sự kiện đề xuất.\","
                 + "\"security\":[{\"bearerAuth\":[]}],"
                 + "\"requestBody\":{"
                 + "  \"required\":true,"
@@ -508,7 +508,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "},"
                 + "\"responses\":{"
                 + "  \"201\":{"
-                + "    \"description\":\"Tạo request sự kiện thành công\","
+                + "    \"description\":\"Organizer tạo request sự kiện thành công\","
                 + "    \"content\":{"
                 + "      \"application/json\":{"
                 + "        \"schema\":{\"$ref\":\"#/components/schemas/CreateEventRequestResponse\"}"
@@ -517,22 +517,22 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "  },"
                 + "  \"400\":{\"description\":\"Thiếu title hoặc dữ liệu không hợp lệ\"},"
                 + "  \"401\":{\"description\":\"Thiếu/Token không hợp lệ\"},"
-                + "  \"403\":{\"description\":\"Chỉ STUDENT mới được tạo request\"},"
+                + "  \"403\":{\"description\":\"Chỉ ORGANIZER mới được tạo request\"},"
                 + "  \"500\":{\"description\":\"Lỗi server khi tạo request\"}"
                 + "}"
                 + "}"
                 + "}";
 
-        // 2) STUDENT xem request của chính mình: GET /api/event-requests/my
+        // 2) ORGANIZER xem request của chính mình: GET /api/event-requests/my
         String myEventRequestsPath
                 = "\"/api/event-requests/my\":{"
                 + "\"get\":{"
-                + "\"summary\":\"Student xem tất cả request sự kiện của chính mình\","
-                + "\"description\":\"Chỉ STUDENT, trả về danh sách Event_Request mà requester_id = userId trong token\","
+                + "\"summary\":\"Organizer xem tất cả request sự kiện của chính mình\","
+                + "\"description\":\"Chỉ ORGANIZER, trả về danh sách Event_Request mà requester_id = userId trong token (tức các request do chính Organizer đó tạo).\","
                 + "\"security\":[{\"bearerAuth\":[]}],"
                 + "\"responses\":{"
                 + "  \"200\":{"
-                + "    \"description\":\"Danh sách request của student\","
+                + "    \"description\":\"Danh sách request của Organizer\","
                 + "    \"content\":{"
                 + "      \"application/json\":{"
                 + "        \"schema\":{"
@@ -543,21 +543,21 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "    }"
                 + "  },"
                 + "  \"401\":{\"description\":\"Thiếu/Token không hợp lệ\"},"
-                + "  \"403\":{\"description\":\"Chỉ STUDENT mới được xem request của mình\"}"
+                + "  \"403\":{\"description\":\"Chỉ ORGANIZER mới được xem request của mình\"}"
                 + "}"
                 + "}"
                 + "}";
 
-        // 3) ORGANIZER xem tất cả request PENDING: GET /api/organizer/event-requests
+        // 3) STAFF xem tất cả request PENDING: GET /api/organizer/event-requests
         String organizerEventRequestsPath
                 = "\"/api/organizer/event-requests\":{"
                 + "\"get\":{"
-                + "\"summary\":\"Organizer xem tất cả request sự kiện đang PENDING\","
-                + "\"description\":\"Chỉ ORGANIZER/ADMIN. Trả về toàn bộ Event_Request có status = PENDING\","
+                + "\"summary\":\"Staff xem tất cả request sự kiện đang PENDING\","
+                + "\"description\":\"Chỉ STAFF (hoặc ADMIN nếu hệ thống cho phép). Trả về toàn bộ Event_Request có status = PENDING để Staff xem và chuẩn bị xử lý.\","
                 + "\"security\":[{\"bearerAuth\":[]}],"
                 + "\"responses\":{"
                 + "  \"200\":{"
-                + "    \"description\":\"Danh sách request PENDING của tất cả student\","
+                + "    \"description\":\"Danh sách request PENDING của tất cả Organizer\","
                 + "    \"content\":{"
                 + "      \"application/json\":{"
                 + "        \"schema\":{"
@@ -568,17 +568,17 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "    }"
                 + "  },"
                 + "  \"401\":{\"description\":\"Thiếu/Token không hợp lệ\"},"
-                + "  \"403\":{\"description\":\"Chỉ ORGANIZER hoặc ADMIN mới được xem\"}"
+                + "  \"403\":{\"description\":\"Chỉ STAFF (hoặc ADMIN) mới được xem danh sách request PENDING\"}"
                 + "}"
                 + "}"
                 + "}";
 
-        // 4) APPROVE / REJECT: POST /api/event-requests/process
+        // 4) STAFF APPROVE / REJECT: POST /api/event-requests/process
         String eventRequestProcessPath
                 = "\"/api/event-requests/process\":{"
                 + "\"post\":{"
-                + "\"summary\":\"Organizer duyệt (APPROVE) hoặc từ chối (REJECT) Event Request\","
-                + "\"description\":\"Chỉ role ORGANIZER/ADMIN. APPROVE sẽ tạo Event mới và gán Area nếu không trùng lịch; REJECT chỉ cập nhật trạng thái request.\","
+                + "\"summary\":\"Staff duyệt (APPROVE) hoặc từ chối (REJECT) Event Request\","
+                + "\"description\":\"Chỉ role STAFF (hoặc ADMIN) được phép xử lý. APPPROVE sẽ tạo Event mới và gán Area nếu không trùng lịch; REJECT chỉ cập nhật trạng thái request.\","
                 + "\"security\":[{\"bearerAuth\":[]}],"
                 + "\"requestBody\":{"
                 + "\"required\":true,"
@@ -590,7 +590,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "},"
                 + "\"responses\":{"
                 + "\"200\":{"
-                + "\"description\":\"Xử lý request thành công (APPROVE hoặc REJECT)\","
+                + "\"description\":\"Staff xử lý request thành công (APPROVE hoặc REJECT)\","
                 + "\"content\":{"
                 + "\"application/json\":{"
                 + "\"schema\":{\"$ref\":\"#/components/schemas/ProcessEventRequestResponse\"}"
@@ -599,7 +599,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "},"
                 + "\"400\":{\"description\":\"Thiếu dữ liệu hoặc action/areaId không hợp lệ\"},"
                 + "\"401\":{\"description\":\"Thiếu hoặc token không hợp lệ\"},"
-                + "\"403\":{\"description\":\"Không phải ORGANIZER/ADMIN\"},"
+                + "\"403\":{\"description\":\"Không phải STAFF/ADMIN nên không được xử lý request\"},"
                 + "\"404\":{\"description\":\"Không tìm thấy request\"},"
                 + "\"409\":{\"description\":\"Khu vực đã có sự kiện trùng thời gian\"},"
                 + "\"500\":{\"description\":\"Lỗi server khi xử lý APPROVE/REJECT\"}"
@@ -607,12 +607,12 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}"
                 + "}";
 
-        // ===== API: /api/areas/free =====
+        // ===== API: /api/areas/free ===== (STAFF chọn khu vực trống)
         String freeAreasPath
                 = "\"/api/areas/free\":{"
                 + "\"get\":{"
-                + "\"summary\":\"Lấy danh sách khu vực trống với buffer 1h (ORGANIZER/ADMIN)\","
-                + "\"description\":\"Check JWT role ORGANIZER/ADMIN, truyền startTime & endTime, trả về danh sách Venue_Area còn trống với buffer 1 giờ.\","
+                + "\"summary\":\"Staff lấy danh sách khu vực trống với buffer 1h (STAFF/ADMIN)\","
+                + "\"description\":\"Check JWT role STAFF/ADMIN, truyền startTime & endTime, trả về danh sách Venue_Area còn trống với buffer 1 giờ để Staff chọn khu vực phù hợp khi duyệt request.\","
                 + "\"security\":[{\"bearerAuth\":[]}],"
                 + "\"parameters\":["
                 + "  {"
@@ -632,7 +632,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "],"
                 + "\"responses\":{"
                 + "  \"200\":{"
-                + "    \"description\":\"Danh sách khu vực còn trống\","
+                + "    \"description\":\"Danh sách khu vực còn trống để Staff lựa chọn\","
                 + "    \"content\":{"
                 + "      \"application/json\":{"
                 + "        \"schema\":{\"$ref\":\"#/components/schemas/FreeAreasResponse\"}"
@@ -646,7 +646,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "    \"description\":\"Thiếu hoặc token không hợp lệ\""
                 + "  },"
                 + "  \"403\":{"
-                + "    \"description\":\"Không phải ORGANIZER/ADMIN\""
+                + "    \"description\":\"Không phải STAFF/ADMIN\""
                 + "  },"
                 + "  \"500\":{"
                 + "    \"description\":\"Lỗi server khi truy vấn danh sách khu vực\""
@@ -665,8 +665,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "\"responses\":{"
                 + "\"200\":{"
                 + "\"description\":\"List of venues with nested areas\","
-                + "\"content\":{"
-                + "\"application/json\":{"
+                + "\"content\":{\"application/json\":{"
                 + "\"schema\":{"
                 + "\"type\":\"array\","
                 + "\"items\":{\"$ref\":\"#/components/schemas/Venue\"}"
@@ -861,6 +860,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}"
                 + "}"
                 + "}";
+
         // ===== API: /api/registrations/my-tickets (Student History) =====
         String myTicketsPath
                 = "\"/api/registrations/my-tickets\":{"
@@ -899,8 +899,6 @@ public class SwaggerConfigServlet extends HttpServlet {
         // ================================
         // ========== GHÉP JSON ===========
         // ================================
-        // Build server URL dynamically from the incoming request so the OpenAPI
-        // JSON matches the actual host/port/context (avoids hardcoded 8080).
         String serverUrl = req.getScheme() + "://" + req.getServerName()
                 + ":" + req.getServerPort() + req.getContextPath();
 
@@ -929,8 +927,8 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + freeAreasPath + ","
                 + buyTicketPath + ","
                 + venuesPath + ","
-                + venueAreasPath + "," // Nhớ đảm bảo dòng trước đó có dấu phẩy
-                + myTicketsPath // <--- CHÈN VÀO ĐÂY
+                + venueAreasPath + ","
+                + myTicketsPath
                 + "},"
                 + "\"components\":{"
                 + "\"securitySchemes\":{"
@@ -1245,7 +1243,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}" // end components
                 + "}";  // end root
 
-        try ( PrintWriter out = resp.getWriter()) {
+        try (PrintWriter out = resp.getWriter()) {
             out.print(json);
             out.flush();
         }

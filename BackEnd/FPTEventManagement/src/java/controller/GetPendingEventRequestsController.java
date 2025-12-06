@@ -45,9 +45,9 @@ public class GetPendingEventRequestsController extends HttpServlet {
         }
 
         String role = JwtUtils.getRoleFromToken(token);
-        if (role == null || (!"ORGANIZER".equalsIgnoreCase(role) && !"ADMIN".equalsIgnoreCase(role))) {
+        if (role == null || (!"STAFF".equalsIgnoreCase(role) && !"ADMIN".equalsIgnoreCase(role))) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            out.print("{\"status\":\"fail\",\"message\":\"Chỉ ORGANIZER/ADMIN mới xem được danh sách request PENDING\"}");
+            out.print("{\"status\":\"fail\",\"message\":\"Chỉ STAFF/ADMIN mới xem được danh sách request PENDING\"}");
             return;
         }
 

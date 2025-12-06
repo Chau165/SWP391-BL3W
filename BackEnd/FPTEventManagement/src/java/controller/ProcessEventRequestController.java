@@ -57,7 +57,7 @@ public class ProcessEventRequestController extends HttpServlet {
         Integer userId = JwtUtils.getIdFromToken(token);
 
         if (userId == null || role == null ||
-                !( "ORGANIZER".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role) )) {
+                !( "STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role) )) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
             out.print("{\"status\":\"fail\",\"message\":\"Chỉ ORGANIZER hoặc ADMIN được duyệt request\"}");
             return;

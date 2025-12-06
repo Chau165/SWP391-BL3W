@@ -47,9 +47,9 @@ public class GetMyEventRequestsController extends HttpServlet {
         String role = JwtUtils.getRoleFromToken(token);
         Integer userId = JwtUtils.getIdFromToken(token);
 
-        if (userId == null || role == null || !"STUDENT".equalsIgnoreCase(role)) {
+        if (userId == null || role == null || !"ORGANIZER".equalsIgnoreCase(role)) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            out.print("{\"status\":\"fail\",\"message\":\"Chỉ STUDENT mới được xem request của mình\"}");
+            out.print("{\"status\":\"fail\",\"message\":\"Chỉ ORGANIZER mới được xem request của mình\"}");
             return;
         }
 

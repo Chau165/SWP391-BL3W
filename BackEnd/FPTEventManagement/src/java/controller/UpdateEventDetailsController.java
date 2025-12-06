@@ -96,7 +96,7 @@ public class UpdateEventDetailsController extends HttpServlet {
             int userId = jwtUser.getUserId();
             String role = jwtUser.getRole(); // STUDENT, ORGANIZER, ADMIN
 
-            if (!"STUDENT".equalsIgnoreCase(role)) {
+            if (!"ORGANIZER".equalsIgnoreCase(role)) {
                 resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
                 out.write("{\"error\":\"Only STUDENT can update event details\"}");
                 return;
