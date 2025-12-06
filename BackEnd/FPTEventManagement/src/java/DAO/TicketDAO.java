@@ -249,6 +249,46 @@ public class TicketDAO {
 
         return result;
     }
+
+    // New: get event statistics (total tickets, checked-in count, check-in rate)
+    public DTO.EventStatsDTO getEventStats(int eventId) {
+        String sql = "SELECT COUNT(*) AS total, "
+                + "SUM(CASE WHEN status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS checked_in "
+                + "FROM Ticket WHERE event_id = ? AND status != 'CANCELLED'";
+
+        try (java.sql.Connection conn = DBUtils.getConnection();
+             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, eventId);
+
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    int total = rs.getInt("total");
+                    int checkedIn = rs.getInt("checked_in");
+
+                    DTO.EventStatsDTO stats = new DTO.EventStatsDTO();
+                    stats.setEventId(eventId);
+                    stats.setTotalRegistered(total);
+                    stats.setTotalCheckedIn(checkedIn);
+
+                    String rate;
+                    if (total <= 0) {
+                        rate = "0%";
+                    } else {
+                        double r = (checkedIn * 100.0) / total;
+                        rate = String.format("%.2f%%", r);
+                    }
+                    stats.setCheckInRate(rate);
+
+                    return stats;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ERROR] getEventStats: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
 }
 
 

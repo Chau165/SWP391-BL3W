@@ -896,6 +896,81 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}"
                 + "}";
 
+        // ===== API: /api/events/stats (Thống kê) =====
+        String eventStatsPath
+                = "\"/api/events/stats\":{"
+                + "\"get\":{"
+                + "\"tags\":[\"Event Organizer\"],"
+                + "\"summary\":\"[Organizer] Thống kê số lượng tham dự\","
+                + "\"description\":\"Đếm tổng số vé đăng ký và số người đã check-in thực tế\","
+                + "\"security\":[{\"bearerAuth\":[]}],"
+                + "\"parameters\":["
+                + "  {"
+                + "    \"name\":\"eventId\","
+                + "    \"in\":\"query\","
+                + "    \"required\":true,"
+                + "    \"schema\":{\"type\":\"integer\"},"
+                + "    \"description\":\"ID của sự kiện cần xem\""
+                + "  }"
+                + "],"
+                + "\"responses\":{"
+                + "  \"200\":{"
+                + "    \"description\":\"Thông tin thống kê\","
+                + "    \"content\":{"
+                + "      \"application/json\":{"
+                + "        \"schema\":{"
+                + "          \"type\":\"object\","
+                + "          \"properties\":{"
+                + "            \"eventId\":{\"type\":\"integer\", \"example\": 1},"
+                + "            \"totalRegistered\":{\"type\":\"integer\", \"example\": 100},"
+                + "            \"totalCheckedIn\":{\"type\":\"integer\", \"example\": 85},"
+                + "            \"checkInRate\":{\"type\":\"string\", \"example\": \"85.0%\"}"
+                + "          }"
+                + "        }"
+                + "      }"
+                + "    }"
+                + "  },"
+                + "  \"403\":{\"description\":\"Không có quyền (Chỉ Organizer/Admin)\"}"
+                + "}"
+                + "}"
+                + "}";
+
+        // ===== API: /api/payment/my-bills (Student Bill History) - UPDATED =====
+        String myBillsPath
+                = "\"/api/payment/my-bills\":{"
+                + "\"get\":{"
+                + "\"tags\":[\"Student\"],"
+                + "\"summary\":\"[Student] Xem lịch sử thanh toán (Bills)\","
+                + "\"description\":\"Lấy danh sách hóa đơn thanh toán (hiển thị Tên người dùng thay vì ID)\","
+                + "\"security\":[{\"bearerAuth\":[]}],"
+                + "\"responses\":{"
+                + "  \"200\":{"
+                + "    \"description\":\"Danh sách hóa đơn\","
+                + "    \"content\":{"
+                + "      \"application/json\":{"
+                + "        \"schema\":{"
+                + "          \"type\":\"array\","
+                + "          \"items\":{"
+                + "            \"type\":\"object\","
+                + "            \"properties\":{"
+                + "              \"billId\":{\"type\":\"integer\", \"example\": 1},"
+                + "              \"userName\":{\"type\":\"string\", \"example\": \"Nguyen Van A\"}," // <--- Thay userId bằng userName
+                + "              \"totalAmount\":{\"type\":\"number\", \"example\": 150000},"
+                + "              \"currency\":{\"type\":\"string\", \"example\": \"VND\"},"
+                + "              \"paymentMethod\":{\"type\":\"string\", \"example\": \"VNPay\"},"
+                + "              \"paymentStatus\":{\"type\":\"string\", \"example\": \"PAID\"},"
+                + "              \"createdAt\":{\"type\":\"string\", \"format\":\"date-time\"}"
+                + "            }"
+                + "          }"
+                + "        }"
+                + "      }"
+                + "    }"
+                + "  },"
+                + "  \"401\":{\"description\":\"Chưa đăng nhập\"}"
+                + "}"
+                + "}"
+                + "}";
+
         // ================================
         // ========== GHÉP JSON ===========
         // ================================
@@ -928,7 +1003,9 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + buyTicketPath + ","
                 + venuesPath + ","
                 + venueAreasPath + ","
-                + myTicketsPath
+                + myTicketsPath + ","
+                + eventStatsPath + ","
+                + myBillsPath
                 + "},"
                 + "\"components\":{"
                 + "\"securitySchemes\":{"
@@ -1243,7 +1320,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}" // end components
                 + "}";  // end root
 
-        try (PrintWriter out = resp.getWriter()) {
+        try ( PrintWriter out = resp.getWriter()) {
             out.print(json);
             out.flush();
         }

@@ -75,18 +75,29 @@ public class BillDAO {
      * @param userId
      * @return 
      */
-    public List<Bill> getBillsByUserId(int userId) {
-        String sql = "SELECT * FROM Bill WHERE user_id = ? ORDER BY created_at DESC";
-        List<Bill> bills = new ArrayList<>();
-        
+    public List<DTO.BillResponse> getBillsByUserId(int userId) {
+        String sql = "SELECT b.bill_id, b.total_amount, b.currency, b.payment_method, b.payment_status, b.created_at, u.full_name "
+                + "FROM Bill b JOIN Users u ON b.user_id = u.user_id "
+                + "WHERE b.user_id = ? ORDER BY b.created_at DESC";
+
+        List<DTO.BillResponse> bills = new ArrayList<>();
+
         try (Connection conn = DBUtils.getConnection();
              PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
             ps.setInt(1, userId);
             ResultSet rs = ps.executeQuery();
-            
+
             while (rs.next()) {
-                bills.add(mapResultSetToBill(rs));
+                DTO.BillResponse br = new DTO.BillResponse();
+                br.setBillId(rs.getInt("bill_id"));
+                br.setTotalAmount(rs.getBigDecimal("total_amount"));
+                br.setCurrency(rs.getString("currency"));
+                br.setPaymentMethod(rs.getString("payment_method"));
+                br.setPaymentStatus(rs.getString("payment_status"));
+                br.setCreatedAt(rs.getTimestamp("created_at"));
+                br.setUserName(rs.getString("full_name"));
+                bills.add(br);
             }
         } catch (Exception e) {
             System.err.println("[ERROR] getBillsByUserId: " + e.getMessage());
