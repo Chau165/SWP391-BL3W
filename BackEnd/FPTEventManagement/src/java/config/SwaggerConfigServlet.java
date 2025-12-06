@@ -900,7 +900,6 @@ public class SwaggerConfigServlet extends HttpServlet {
         String eventStatsPath
                 = "\"/api/events/stats\":{"
                 + "\"get\":{"
-                + "\"tags\":[\"Event Organizer\"],"
                 + "\"summary\":\"[Organizer] Thống kê số lượng tham dự\","
                 + "\"description\":\"Đếm tổng số vé đăng ký và số người đã check-in thực tế\","
                 + "\"security\":[{\"bearerAuth\":[]}],"
@@ -938,8 +937,7 @@ public class SwaggerConfigServlet extends HttpServlet {
         // ===== API: /api/payment/my-bills (Student Bill History) - UPDATED =====
         String myBillsPath
                 = "\"/api/payment/my-bills\":{"
-                + "\"get\":{"
-                + "\"tags\":[\"Student\"],"
+                + "\"get\":{"              
                 + "\"summary\":\"[Student] Xem lịch sử thanh toán (Bills)\","
                 + "\"description\":\"Lấy danh sách hóa đơn thanh toán (hiển thị Tên người dùng thay vì ID)\","
                 + "\"security\":[{\"bearerAuth\":[]}],"
@@ -953,13 +951,13 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "          \"items\":{"
                 + "            \"type\":\"object\","
                 + "            \"properties\":{"
-                + "              \"billId\":{\"type\":\"integer\", \"example\": 1},"
-                + "              \"userName\":{\"type\":\"string\", \"example\": \"Nguyen Van A\"}," // <--- Thay userId bằng userName
-                + "              \"totalAmount\":{\"type\":\"number\", \"example\": 150000},"
-                + "              \"currency\":{\"type\":\"string\", \"example\": \"VND\"},"
-                + "              \"paymentMethod\":{\"type\":\"string\", \"example\": \"VNPay\"},"
-                + "              \"paymentStatus\":{\"type\":\"string\", \"example\": \"PAID\"},"
-                + "              \"createdAt\":{\"type\":\"string\", \"format\":\"date-time\"}"
+                + "              \"billId\":{\"type\":\"integer\", \"example\": number},"
+                + "              \"totalAmount\":{\"type\":\"number\", \"example\": number},"
+                + "              \"currency\":{\"type\":\"string\", \"example\": \"string\"},"
+                + "              \"paymentMethod\":{\"type\":\"string\", \"example\": \"string\"},"
+                + "              \"paymentStatus\":{\"type\":\"string\", \"example\": \"string\"},"
+                + "              \"createdAt\":{\"type\":\"string\", \"format\":\"string\"},"
+                + "              \"userName\":{\"type\":\"string\", \"example\": \"string\"}" // <--- Thay userId bằng userName                
                 + "            }"
                 + "          }"
                 + "        }"
