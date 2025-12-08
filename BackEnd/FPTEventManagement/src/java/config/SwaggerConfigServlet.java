@@ -366,12 +366,14 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}"
                 + "}";
 
-        // ===== API: /api/buyTicket =====
+        // ===== API: /api/buyTicket (Cập nhật Description) =====
+        // ===== API: /api/buyTicket (Cập nhật Description: Gửi Mail QR) =====
         String buyTicketPath
                 = "\"/api/buyTicket\":{"
                 + "\"get\":{"
-                + "\"summary\":\"VNPay return URL - xác nhận thanh toán và tạo vé\","
-                + "\"description\":\"VNPay redirect về URL này sau khi thanh toán. Hệ thống sẽ verify chữ ký, kiểm tra mã phản hồi, tạo Bill & Ticket.\","
+                + "\"tags\":[\"Payment\"],"
+                + "\"summary\":\"VNPay return URL - Xác nhận thanh toán & Gửi vé qua Email\","
+                + "\"description\":\"VNPay redirect về URL này. Hệ thống sẽ: 1. Verify chữ ký -> 2. Tạo Bill & Ticket -> 3. Tạo mã QR từ TicketID -> 4. Gửi email đính kèm ảnh QR cho sinh viên.\","
                 + "\"parameters\":["
                 + "  {"
                 + "    \"name\":\"vnp_Amount\","
@@ -411,7 +413,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "],"
                 + "\"responses\":{"
                 + "  \"200\":{"
-                + "    \"description\":\"Kết quả xử lý thanh toán (text)\","
+                + "    \"description\":\"Kết quả xử lý (text). Nếu thành công sẽ báo 'Payment Success' và gửi email.\","
                 + "    \"content\":{"
                 + "      \"text/plain\":{"
                 + "        \"schema\":{\"type\":\"string\"}"
