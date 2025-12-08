@@ -1,13 +1,14 @@
 package controller;
 
 import DAO.UsersDAO;
+import DTO.LoginRequest;
 import DTO.Users;
 import com.google.gson.Gson;
-
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.*;
 import utils.JwtUtils;
+import utils.RecaptchaUtils;
 
 @WebServlet("/api/login")
 public class loginController extends HttpServlet {
@@ -28,19 +29,27 @@ public class loginController extends HttpServlet {
         setCorsHeaders(response, request);
         response.setContentType("application/json;charset=UTF-8");
 
-        try ( BufferedReader reader = request.getReader();  PrintWriter out = response.getWriter()) {
+        try (BufferedReader reader = request.getReader(); PrintWriter out = response.getWriter()) {
 
             LoginRequest loginReq = gson.fromJson(reader, LoginRequest.class);
 
-            if (loginReq == null || isBlank(loginReq.email) || isBlank(loginReq.password)) {
+            if (loginReq == null || isBlank(loginReq.getEmail()) || isBlank(loginReq.getPassword())) {
                 response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 out.print(jsonFail("Thiếu email hoặc mật khẩu", "AUTH_MISSING_FIELD"));
                 out.flush();
                 return;
             }
 
+            // Verify reCAPTCHA
+            if (!RecaptchaUtils.verify(loginReq.getRecaptchaToken())) {
+                response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                out.print("{\"error\": \"Invalid reCAPTCHA\"}");
+                out.flush();
+                return;
+            }
+
             // ✅ checkLogin giờ đã tự verify password hash
-            Users user = usersDAO.checkLogin(loginReq.email.trim(), loginReq.password);
+            Users user = usersDAO.checkLogin(loginReq.getEmail().trim(), loginReq.getPassword());
 
             if (user != null) {
 
@@ -69,7 +78,7 @@ public class loginController extends HttpServlet {
         } catch (Exception e) {
             e.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            try ( PrintWriter out = response.getWriter()) {
+            try (PrintWriter out = response.getWriter()) {
                 out.print(jsonError("Lỗi server: " + e.getMessage()));
                 out.flush();
             }
@@ -87,7 +96,7 @@ public class loginController extends HttpServlet {
                 || origin.contains("ngrok-free.app")
                 || // ⭐ Cho phép ngrok
                 origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
-                );
+        );
 
         if (allowed) {
             res.setHeader("Access-Control-Allow-Origin", origin);
@@ -123,12 +132,6 @@ public class loginController extends HttpServlet {
     }
 
     // ==================== DTOs ====================
-    private static class LoginRequest {
-
-        String email;
-        String password;
-    }
-
     private static class LoginResponse {
 
         String status;
