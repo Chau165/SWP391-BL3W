@@ -1,5 +1,6 @@
 package DTO;
 
+
 public class EventStatsDTO {
 
     private int eventId;

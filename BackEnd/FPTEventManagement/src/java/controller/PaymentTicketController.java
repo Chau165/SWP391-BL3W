@@ -6,7 +6,8 @@ import config.VnPayUtil;
 
 import DAO.CategoryTicketDAO;
 import DAO.EventDAO;
-import DAO.SeatDAO;
+import DAO.EventSeatLayoutDAO;   // ✅ dùng layout theo event
+import DAO.SeatDAO;             // optional, chỉ để double-check Ticket
 import DTO.CategoryTicket;
 import DTO.Event;
 import DTO.Seat;
@@ -19,6 +20,9 @@ import java.math.BigDecimal;
 @WebServlet("/api/payment-ticket")
 public class PaymentTicketController extends HttpServlet {
 
+    private final EventSeatLayoutDAO eventSeatLayoutDAO = new EventSeatLayoutDAO();
+    private final SeatDAO seatDAO = new SeatDAO(); // chỉ dùng hàm isSeatAlreadyBookedForEvent (nếu muốn)
+
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
         resp.setContentType("text/plain;charset=UTF-8");
@@ -29,10 +33,10 @@ public class PaymentTicketController extends HttpServlet {
             System.out.println("RemoteAddr: " + req.getRemoteAddr());
 
             // ================== Lấy tham số ==================
-            String userIdStr      = req.getParameter("userId");
-            String eventIdStr     = req.getParameter("eventId");
-            String categoryIdStr  = req.getParameter("categoryTicketId");
-            String seatIdStr      = req.getParameter("seatId");
+            String userIdStr     = req.getParameter("userId");
+            String eventIdStr    = req.getParameter("eventId");
+            String categoryIdStr = req.getParameter("categoryTicketId");
+            String seatIdStr     = req.getParameter("seatId");
 
             System.out.println("Raw params -> userId=" + userIdStr
                     + ", eventId=" + eventIdStr
@@ -47,10 +51,10 @@ public class PaymentTicketController extends HttpServlet {
                 return;
             }
 
-            int userId          = Integer.parseInt(userIdStr);
-            int eventId         = Integer.parseInt(eventIdStr);
-            int categoryId      = Integer.parseInt(categoryIdStr);
-            int seatId          = Integer.parseInt(seatIdStr);
+            int userId     = Integer.parseInt(userIdStr);
+            int eventId    = Integer.parseInt(eventIdStr);
+            int categoryId = Integer.parseInt(categoryIdStr);
+            int seatId     = Integer.parseInt(seatIdStr);
 
             System.out.println("Parsed params -> userId=" + userId
                     + ", eventId=" + eventId
@@ -81,44 +85,56 @@ public class PaymentTicketController extends HttpServlet {
                 return;
             }
 
-            // ================== Validate Seat ==================
-            SeatDAO seatDAO = new SeatDAO();
-            Seat seat = seatDAO.getSeatById(seatId);
-            System.out.println("[CHECK] Seat: " + seat);
+            // ================== Validate Seat (theo layout event) ==================
+            // ❗❗ LẤY GHẾ TỪ Event_Seat_Layout + Seat
+            Seat seat = eventSeatLayoutDAO.getSeatForEvent(eventId, seatId);
+            System.out.println("[CHECK] Seat for event: " + seat);
 
-            // ✅ ĐỔI: so sánh theo areaId thay vì venueId
-            if (seat == null
-                    || event.getAreaId() == null
-                    || seat.getAreaId() != event.getAreaId()) {
+            if (seat == null) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().println("Seat not found or not belong to event area");
-                System.out.println("❌ Seat not found or not belong to event area");
+                resp.getWriter().println("Seat not configured for this event");
+                System.out.println("❌ Seat not configured for this event");
                 return;
             }
 
-            if (!"ACTIVE".equalsIgnoreCase(seat.getStatus())) {
+            // optional: check ghế có thuộc area của event không
+            if (event.getAreaId() != null && seat.getAreaId() != event.getAreaId()) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().println("Seat is not ACTIVE");
-                System.out.println("❌ Seat is not ACTIVE");
+                resp.getWriter().println("Seat does not belong to event area");
+                System.out.println("❌ Seat does not belong to event area");
                 return;
             }
 
-            if (!seat.getSeatType().equalsIgnoreCase(ct.getName())) {
+            // status ở đây là layout_status: AVAILABLE / BOOKED
+            if (!"AVAILABLE".equalsIgnoreCase(seat.getStatus())) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                resp.getWriter().println("Seat is not AVAILABLE for this event");
+                System.out.println("❌ Seat is not AVAILABLE for this event, status=" + seat.getStatus());
+                return;
+            }
+
+            // So sánh loại ghế: seat_type (VIP/STANDARD) vs CategoryTicket.name (ví dụ "VIP", "STANDARD")
+            String seatType = seat.getSeatType();      // lấy từ Event_Seat_Layout
+            String ticketName = ct.getName();          // "VIP", "Standard", "Vé VIP",...
+
+            if (seatType == null || ticketName == null
+                    || !seatType.equalsIgnoreCase(ticketName.trim())) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 resp.getWriter().println("Seat type does not match ticket type");
-                System.out.println("❌ Seat type does not match ticket type");
+                System.out.println("❌ Seat type mismatch. seatType=" + seatType + ", ticketName=" + ticketName);
                 return;
             }
 
+            // (optional) double-check bằng Ticket table
             if (seatDAO.isSeatAlreadyBookedForEvent(eventId, seatId)) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 resp.getWriter().println("Seat already booked");
-                System.out.println("❌ Seat already booked");
+                System.out.println("❌ Seat already booked (check from Ticket table)");
                 return;
             }
 
             // ================== Tính tiền ==================
-            BigDecimal price = ct.getPrice();      // ví dụ 150000.00
+            BigDecimal price = ct.getPrice();    // ví dụ 150000.00
             long amountVND   = price.longValue(); // 150000
 
             System.out.println("[PRICE] Ticket price(BigDecimal) = " + price
@@ -144,7 +160,7 @@ public class PaymentTicketController extends HttpServlet {
                     vnp_TxnRef,
                     amountVND,
                     orderInfo,
-                    "other"        // vnp_OrderType: dùng "other" cho an toàn
+                    "other"        // vnp_OrderType
             );
 
             System.out.println("===== [PaymentTicketController] Redirect VNPay URL =====");
@@ -155,8 +171,9 @@ public class PaymentTicketController extends HttpServlet {
 
         } catch (Exception e) {
             e.printStackTrace();
-            resp.getWriter().println("Lỗi thanh toán vé: " + e.getMessage());
-            System.out.println("❌ Exception in PaymentTicketController: " + e.getMessage());
+            // in cả toString cho dễ debug loại Exception
+            resp.getWriter().println("Lỗi thanh toán vé: " + e.toString());
+            System.out.println("❌ Exception in PaymentTicketController: " + e.toString());
         }
     }
 }

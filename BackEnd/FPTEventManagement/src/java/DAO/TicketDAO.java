@@ -249,8 +249,8 @@ public class TicketDAO {
 
         return result;
     }
-
-    // New: get event statistics (total tickets, checked-in count, check-in rate)
+    
+     // New: get event statistics (total tickets, checked-in count, check-in rate)
     public DTO.EventStatsDTO getEventStats(int eventId) {
         String sql = "SELECT COUNT(*) AS total, "
                 + "SUM(CASE WHEN status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS checked_in "

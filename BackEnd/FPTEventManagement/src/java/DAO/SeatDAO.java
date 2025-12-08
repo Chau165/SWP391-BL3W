@@ -3,39 +3,38 @@ package DAO;
 import DTO.Seat;
 import mylib.DBUtils;
 
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
-import java.sql.SQLException;
+import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
 public class SeatDAO {
 
-    // ====================== MAP RESULTSET → DTO ======================
+    // ====================== MAP RESULTSET → DTO (GHẾ VẬT LÝ) ======================
     private Seat mapRowToSeat(ResultSet rs) throws SQLException {
         Seat seat = new Seat();
         seat.setSeatId(rs.getInt("seat_id"));
-        seat.setAreaId(rs.getInt("area_id"));          // ✅ area_id thay vì venue_id
+        seat.setAreaId(rs.getInt("area_id"));
         seat.setSeatCode(rs.getString("seat_code"));
         seat.setRowNo(rs.getString("row_no"));
         seat.setColNo(rs.getString("col_no"));
+        // status ở đây là status vật lý: ACTIVE / INACTIVE
         seat.setStatus(rs.getString("status"));
-        seat.setSeatType(rs.getString("seat_type"));   // VIP / STANDARD / ...
+        // ghế vật lý không có seat_type
+        seat.setSeatType(null);
         return seat;
     }
 
-    // ====================== GET BY ID ======================
+    // ====================== GET BY ID (GHẾ VẬT LÝ) ======================
     public Seat getSeatById(int seatId) {
-        String sql = "SELECT seat_id, area_id, seat_code, row_no, col_no, "
-                + "       status, seat_type "
-                + "FROM   Seat WHERE seat_id = ?";
+        String sql = "SELECT seat_id, area_id, seat_code, row_no, col_no, status " +
+                     "FROM Seat WHERE seat_id = ?";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, seatId);
 
-            try ( ResultSet rs = ps.executeQuery()) {
+            try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return mapRowToSeat(rs);
                 }
@@ -47,23 +46,20 @@ public class SeatDAO {
         return null;
     }
 
-    // ====================== CHECK BOOKED FOR EVENT ======================
-    /**
-     * Kiểm tra ghế đã được đặt cho event này chưa Ticket.status: 'BOOKED',
-     * 'CHECKED_IN' được xem là đã chiếm ghế
-     */
+    // ====================== CHECK BOOKED FOR EVENT (VẪN DÙNG TICKET) ======================
     public boolean isSeatAlreadyBookedForEvent(int eventId, int seatId) {
-        String sql = "SELECT COUNT(*) AS cnt "
-                + "FROM Ticket "
-                + "WHERE event_id = ? AND seat_id = ? "
-                + "  AND status IN ('BOOKED','CHECKED_IN')";
+        String sql = "SELECT COUNT(*) AS cnt " +
+                     "FROM Ticket " +
+                     "WHERE event_id = ? AND seat_id = ? " +
+                     "  AND status IN ('BOOKED','CHECKED_IN')";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, eventId);
             ps.setInt(2, seatId);
 
-            try ( ResultSet rs = ps.executeQuery()) {
+            try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     int count = rs.getInt("cnt");
                     return count > 0;
@@ -76,25 +72,22 @@ public class SeatDAO {
         return false;
     }
 
-    // ====================== LIST BY AREA (tên cũ: venue) ======================
-    /**
-     * Lấy toàn bộ ghế theo area. Lưu ý: tham số venueId bây giờ thực chất là
-     * areaId (do đổi schema).
-     */
+    // ====================== LIST BY AREA (GHẾ VẬT LÝ) ======================
     public List<Seat> getSeatsByVenue(int venueId) {
-        int areaId = venueId; // alias cho dễ chuyển code cũ
+        int areaId = venueId; // alias
         List<Seat> list = new ArrayList<>();
 
-        String sql = "SELECT seat_id, area_id, seat_code, row_no, col_no, status, seat_type "
-                + "FROM   Seat "
-                + "WHERE  area_id = ? "
-                + "ORDER BY row_no, col_no";
+        String sql = "SELECT seat_id, area_id, seat_code, row_no, col_no, status " +
+                     "FROM Seat " +
+                     "WHERE area_id = ? " +
+                     "ORDER BY row_no, col_no";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, areaId);
 
-            try ( ResultSet rs = ps.executeQuery()) {
+            try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     list.add(mapRowToSeat(rs));
                 }
@@ -106,44 +99,22 @@ public class SeatDAO {
         return list;
     }
 
-    // ====================== LIST BY AREA + TYPE ======================
-    /**
-     * Lấy ghế theo area + loại ghế (seat_type: VIP / STANDARD / ...) Tham số
-     * venueId thực chất là areaId.
-     */
+    // 🚨 HÀM CŨ TỪNG GÂY LỖI: GIỜ SỬA LẠI KHÔNG DÙNG seat_type NỮA
+    // Ở mode ghế vật lý thì không có khái niệm VIP/Standard, nên
+    // cứ trả list ghế theo area, seatType lúc này bỏ qua.
     public List<Seat> getSeatsByVenueAndType(int venueId, String seatType) {
-        int areaId = venueId; // alias
-
-        List<Seat> list = new ArrayList<>();
-
-        String sql = "SELECT seat_id, area_id, seat_code, row_no, col_no, status, seat_type "
-                + "FROM   Seat "
-                + "WHERE  area_id = ? AND seat_type = ? "
-                + "ORDER BY row_no, col_no";
-
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
-
-            ps.setInt(1, areaId);
-            ps.setString(2, seatType);
-
-            try ( ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(mapRowToSeat(rs));
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("[ERROR] getSeatsByVenueAndType/AreaAndType: " + e.getMessage());
-            e.printStackTrace();
-        }
-        return list;
+        // Nếu chỗ nào code cũ gọi hàm này, vẫn tránh crash
+        return getSeatsByVenue(venueId);
     }
 
+    // ====================== UPDATE STATUS VẬT LÝ ======================
     public boolean updateSeatStatus(int seatId, String newStatus) {
         String sql = "UPDATE Seat SET status = ? WHERE seat_id = ?";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-            ps.setString(1, newStatus);   // 'INACTIVE'
+            ps.setString(1, newStatus);
             ps.setInt(2, seatId);
 
             int rows = ps.executeUpdate();
@@ -155,116 +126,44 @@ public class SeatDAO {
         }
     }
 
-    // Lấy danh sách ghế CÒN TRỐNG cho 1 event (theo eventId + areaId + optional seatType)
-    public List<Seat> getAvailableSeatsForEvent(int eventId, int areaId, String seatType) {
-        List<Seat> list = new ArrayList<>();
+    // ====================== GENERATE GHẾ VẬT LÝ CHO AREA ======================
+    public void generateSeatsForArea(int areaId, int capacity) throws SQLException, ClassNotFoundException {
+        String sql = "INSERT INTO Seat (seat_code, row_no, col_no, status, area_id) " +
+                     "VALUES (?, ?, ?, ?, ?)";
 
-        StringBuilder sql = new StringBuilder(
-                "SELECT s.seat_id, s.area_id, s.seat_code, s.row_no, s.col_no, s.status, s.seat_type "
-                + "FROM Seat s "
-                + "WHERE s.area_id = ? "
-                + "  AND s.status = 'ACTIVE' "
-                + // ghế vật lý còn dùng được
-                "  AND NOT EXISTS ( "
-                + "      SELECT 1 FROM Ticket t "
-                + "      WHERE t.event_id = ? "
-                + "        AND t.seat_id = s.seat_id "
-                + "        AND t.status IN ('BOOKED','CHECKED_IN') "
-                + "  ) "
-        );
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
 
-        // Nếu filter theo loại ghế (VIP / STANDARD)
-        boolean filterByType = (seatType != null && !seatType.trim().isEmpty());
-        if (filterByType) {
-            sql.append(" AND s.seat_type = ? ");
-        }
+            int seatsPerRow = 10;   // 10 ghế / hàng: A1..A10, B1..B10,...
+            char row = 'A';
+            int col = 1;
 
-        sql.append(" ORDER BY s.row_no, s.col_no ");
+            for (int i = 1; i <= capacity; i++) {
+                String seatCode = row + String.valueOf(col);
+                String rowNo = String.valueOf(row);
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+                String status = "ACTIVE";
 
-            ps.setInt(1, areaId);
-            ps.setInt(2, eventId);
+                ps.setString(1, seatCode);
+                ps.setString(2, rowNo);
+                ps.setInt(3, col);
+                ps.setString(4, status);
+                ps.setInt(5, areaId);
 
-            if (filterByType) {
-                ps.setString(3, seatType.trim());
-            }
+                ps.addBatch();
 
-            try ( ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    list.add(mapRowToSeat(rs));
-                }
-            }
-        } catch (Exception e) {
-            System.err.println("[ERROR] getAvailableSeatsForEvent: " + e.getMessage());
-            e.printStackTrace();
-        }
-
-        return list;
-    }
-
-    public void reconfigureSeatsForArea(Connection conn, int areaId, int vipCount, int standardCount) throws SQLException {
-        int totalNeeded = vipCount + standardCount;
-
-        // 1. Lấy toàn bộ seat_id cho area này (giữ layout theo row/col)
-        List<Integer> seatIds = new ArrayList<>();
-
-        String selectSql = "SELECT seat_id "
-                + "FROM Seat "
-                + "WHERE area_id = ? "
-                + "ORDER BY row_no, col_no";
-
-        try ( PreparedStatement ps = conn.prepareStatement(selectSql)) {
-            ps.setInt(1, areaId);
-            try ( ResultSet rs = ps.executeQuery()) {
-                while (rs.next()) {
-                    seatIds.add(rs.getInt("seat_id"));
-                }
-            }
-        }
-
-        if (seatIds.size() < totalNeeded) {
-            throw new RuntimeException(
-                    "Not enough physical seats in area_id=" + areaId
-                    + " | seats in DB=" + seatIds.size()
-                    + " < required=" + totalNeeded
-            );
-        }
-
-        // 2. Cập nhật lại seat_type + status
-        String updateSql = "UPDATE Seat SET seat_type = ?, status = ? WHERE seat_id = ?";
-
-        try ( PreparedStatement psUpdate = conn.prepareStatement(updateSql)) {
-
-            int index = 0;
-            for (Integer seatId : seatIds) {
-                String seatType;
-                String status;
-
-                if (index < totalNeeded) {
-                    // ghế nằm trong quota sử dụng
-                    status = "ACTIVE";
-
-                    if (index < vipCount) {
-                        seatType = "VIP";
-                    } else {
-                        seatType = "STANDARD";
-                    }
-                } else {
-                    // ghế dư, tạm inactive để không dùng
-                    seatType = "STANDARD"; // hoặc giữ nguyên, tùy bạn
-                    status = "INACTIVE";
+                col++;
+                if (col > seatsPerRow) {
+                    col = 1;
+                    row++;
                 }
 
-                psUpdate.setString(1, seatType);
-                psUpdate.setString(2, status);
-                psUpdate.setInt(3, seatId);
-                psUpdate.addBatch();
-
-                index++;
+                if (i % 100 == 0) {
+                    ps.executeBatch();
+                }
             }
 
-            psUpdate.executeBatch();
+            ps.executeBatch();
         }
     }
 }

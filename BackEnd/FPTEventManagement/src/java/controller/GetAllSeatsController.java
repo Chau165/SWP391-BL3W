@@ -1,6 +1,7 @@
 package controller;
 
 import DAO.SeatDAO;
+import DAO.EventSeatLayoutDAO;
 import DTO.Seat;
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
@@ -14,7 +15,8 @@ import java.util.List;
 @WebServlet("/api/seats")
 public class GetAllSeatsController extends HttpServlet {
 
-    private final SeatDAO seatDAO = new SeatDAO();
+    private final SeatDAO seatDAO = new SeatDAO();                     // ghế vật lý
+    private final EventSeatLayoutDAO eventSeatLayoutDAO = new EventSeatLayoutDAO();  // layout theo event
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
 
     @Override
@@ -23,70 +25,68 @@ public class GetAllSeatsController extends HttpServlet {
         resp.setContentType("application/json;charset=UTF-8");
 
         try {
-            String areaIdStr = req.getParameter("areaId");
-            String seatType = req.getParameter("seatType"); // optional
-            String eventIdStr = req.getParameter("eventId");  // dùng để đánh dấu ghế đã được đặt
-
-            if (areaIdStr == null) {
-                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().write("{\"error\":\"Missing areaId\"}");
-                return;
-            }
-
-            int areaId;
-            try {
-                areaId = Integer.parseInt(areaIdStr);
-            } catch (NumberFormatException e) {
-                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().write("{\"error\":\"Invalid areaId\"}");
-                return;
-            }
+            String areaIdStr  = req.getParameter("areaId");
+            String seatType   = req.getParameter("seatType"); // optional, dùng cho layout event
+            String eventIdStr = req.getParameter("eventId");  // nếu có => ưu tiên lấy layout theo event
 
             List<Seat> seats;
 
-            // ✅ Luôn lấy FULL danh sách ghế trong area (có thể filter theo seatType)
-            if (seatType != null && !seatType.trim().isEmpty()) {
-                seats = seatDAO.getSeatsByVenueAndType(areaId, seatType.trim());
-            } else {
-                seats = seatDAO.getSeatsByVenue(areaId);
-            }
+            Integer eventId = null;
+            Integer areaId  = null;
 
-            // Nếu có eventId → đánh dấu ghế nào đã được đặt trong event đó
+            // ===== CASE 1: CÓ eventId → lấy layout ghế THEO EVENT =====
             if (eventIdStr != null && !eventIdStr.trim().isEmpty()) {
-                int eventId;
                 try {
-                    eventId = Integer.parseInt(eventIdStr);
+                    eventId = Integer.parseInt(eventIdStr.trim());
                 } catch (NumberFormatException e) {
                     resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                     resp.getWriter().write("{\"error\":\"Invalid eventId\"}");
                     return;
                 }
 
-                if (seats != null) {
-                    for (Seat s : seats) {
-                        boolean booked = seatDAO.isSeatAlreadyBookedForEvent(eventId, s.getSeatId());
+                // Lấy toàn bộ ghế cấu hình cho event (JOIN Event_Seat_Layout + Seat)
+                seats = eventSeatLayoutDAO.getSeatsForEvent(eventId, seatType);
 
-                        // 🚩 Ghi đè status để FE dễ hiểu:
-                        // - "BOOKED": ghế đã có ticket trong event này
-                        // - "AVAILABLE": ghế chưa được đặt trong event này
-                        s.setStatus(booked ? "BOOKED" : "AVAILABLE");
-                    }
+                // Lấy areaId từ ghế đầu tiên (nếu có)
+                if (seats != null && !seats.isEmpty()) {
+                    areaId = seats.get(0).getAreaId();
+                } else {
+                    // Không có layout ghế cho event này → trả empty list
+                    areaId = (areaIdStr != null && !areaIdStr.isEmpty())
+                            ? Integer.parseInt(areaIdStr)
+                            : null;
                 }
-            }
-            // Nếu KHÔNG có eventId → giữ nguyên status như trong DB (ACTIVE/INACTIVE)
 
-            // 🔥 SẮP XẾP LẠI DANH SÁCH GHẾ THEO THỨ TỰ RÕ RÀNG
+            // ===== CASE 2: KHÔNG có eventId → chỉ trả ghế VẬT LÝ của area =====
+            } else {
+                if (areaIdStr == null || areaIdStr.trim().isEmpty()) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.getWriter().write("{\"error\":\"Missing areaId or eventId\"}");
+                    return;
+                }
+
+                try {
+                    areaId = Integer.parseInt(areaIdStr.trim());
+                } catch (NumberFormatException e) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.getWriter().write("{\"error\":\"Invalid areaId\"}");
+                    return;
+                }
+
+                // Ở mode ghế vật lý, không có seat_type, nên bỏ qua param seatType
+                seats = seatDAO.getSeatsByVenue(areaId);
+            }
+
+            // 🔥 SẮP XẾP LẠI DANH SÁCH GHẾ THEO THỨ TỰ ROW/COL
             if (seats != null) {
                 seats.sort(new Comparator<Seat>() {
                     @Override
                     public int compare(Seat s1, Seat s2) {
-                        // So sánh theo row_no (A, B, C,...)
                         String r1 = s1.getRowNo() != null ? s1.getRowNo() : "";
                         String r2 = s2.getRowNo() != null ? s2.getRowNo() : "";
                         int cmpRow = r1.compareToIgnoreCase(r2);
                         if (cmpRow != 0) return cmpRow;
 
-                        // Nếu cùng row → so sánh theo col_no (chuyển sang số để tránh A1, A10, A2)
                         int c1 = parseColNumber(s1.getColNo());
                         int c2 = parseColNumber(s2.getColNo());
                         return Integer.compare(c1, c2);
@@ -94,8 +94,10 @@ public class GetAllSeatsController extends HttpServlet {
                 });
             }
 
+            // Build response
             SeatResponse seatResponse = new SeatResponse();
-            seatResponse.setAreaId(areaId);
+            seatResponse.setEventId(eventId);
+            seatResponse.setAreaId(areaId != null ? areaId : 0);
             seatResponse.setSeatType(seatType);
             seatResponse.setTotal(seats != null ? seats.size() : 0);
             seatResponse.setSeats(seats);
@@ -124,10 +126,19 @@ public class GetAllSeatsController extends HttpServlet {
     // Class nhỏ để wrap response
     private static class SeatResponse {
 
-        private int areaId;       // 🔁 thay venueId -> areaId
+        private Integer eventId;
+        private int areaId;
         private String seatType;
         private int total;
         private List<Seat> seats;
+
+        public Integer getEventId() {
+            return eventId;
+        }
+
+        public void setEventId(Integer eventId) {
+            this.eventId = eventId;
+        }
 
         public int getAreaId() {
             return areaId;
@@ -186,5 +197,4 @@ public class GetAllSeatsController extends HttpServlet {
         res.setHeader("Access-Control-Expose-Headers", "Authorization");
         res.setHeader("Access-Control-Max-Age", "86400");
     }
-
 }

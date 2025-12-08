@@ -74,9 +74,9 @@ public class StaffCheckinController extends HttpServlet {
 
         // ===== 2. Kiểm tra role: chỉ STAFF / ADMIN mới được check-in =====
         String role = JwtUtils.getRoleFromToken(token);
-        if (role == null || !(role.equalsIgnoreCase("STAFF") || role.equalsIgnoreCase("ADMIN"))) {
+        if (role == null || !(role.equalsIgnoreCase("ORGANIZER") || role.equalsIgnoreCase("ADMIN"))) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            resp.getWriter().write("{\"error\":\"Permission denied. STAFF only.\"}");
+            resp.getWriter().write("{\"error\":\"Permission denied. ORGANIZER only.\"}");
             return;
         }
 

@@ -117,20 +117,32 @@ public class VenueAreaDAO {
     }
 
     // Create new venue area
-    public boolean createArea(int venueId, String areaName, String floor, int capacity) {
-        String sql = "INSERT INTO Venue_Area (venue_id, area_name, floor, capacity, status) VALUES (?, ?, ?, ?, N'AVAILABLE')";
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+    public int createArea(int venueId, String areaName, String floor, int capacity)
+            throws SQLException, ClassNotFoundException {
+
+        String sql = "INSERT INTO Venue_Area (venue_id, area_name, floor, capacity, status) "
+                + "VALUES (?, ?, ?, ?, 'AVAILABLE')";
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
             ps.setInt(1, venueId);
-            ps.setNString(2, areaName);
-            ps.setNString(3, floor);
+            ps.setString(2, areaName);
+            ps.setString(3, floor);
             ps.setInt(4, capacity);
-            int inserted = ps.executeUpdate();
-            return inserted > 0;
-        } catch (Exception e) {
-            System.err.println("[ERROR] createArea: " + e.getMessage());
-            e.printStackTrace();
-            return false;
+
+            int affected = ps.executeUpdate();
+            if (affected == 0) {
+                return -1; // insert fail
+            }
+
+            try ( ResultSet rs = ps.getGeneratedKeys()) {
+                if (rs.next()) {
+                    return rs.getInt(1); // 👈 area_id vừa tạo
+                }
+            }
         }
+
+        return -1;
     }
 
     // Check if an area exists by area_id

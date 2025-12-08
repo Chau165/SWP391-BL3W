@@ -5,6 +5,7 @@ import com.google.gson.Gson;
 import service.VenueAreaService;
 import utils.JwtUtils;
 import DAO.VenueAreaDAO;
+import DAO.SeatDAO;
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.HttpServlet;
@@ -24,6 +25,7 @@ public class VenueAreaController extends HttpServlet {
     private final Gson gson = new Gson();
     private final VenueAreaService service = new VenueAreaService();
     private final VenueAreaDAO dao = new VenueAreaDAO();
+    private final SeatDAO seatDAO = new SeatDAO(); // ✅ thêm DAO để auto tạo ghế
 
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -93,7 +95,7 @@ public class VenueAreaController extends HttpServlet {
 
         PrintWriter out = resp.getWriter();
 
-        // Auth: Bearer token required and role = ADMIN
+        // Auth: Bearer token required and role = STAFF
         String auth = req.getHeader("Authorization");
         if (auth == null || !auth.startsWith("Bearer ")) {
             resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -150,14 +152,46 @@ public class VenueAreaController extends HttpServlet {
             return;
         }
 
+        // Gọi service tạo Area
         Map<String, Object> result = service.createArea(area);
         boolean ok = Boolean.TRUE.equals(result.get("success"));
+
         Map<String, Object> respMap = new HashMap<>();
         respMap.put("message", result.get("message"));
+
         if (ok) {
-            resp.setStatus(HttpServletResponse.SC_CREATED);
-            respMap.put("status", "success");
-            out.print(gson.toJson(respMap));
+            // ✅ Lấy areaId trả về từ service và auto tạo ghế
+            Integer areaId = null;
+            Object areaIdObj = result.get("areaId");
+            if (areaIdObj instanceof Integer) {
+                areaId = (Integer) areaIdObj;
+            } else if (areaIdObj instanceof Long) {
+                areaId = ((Long) areaIdObj).intValue();
+            }
+
+            Integer capacity = area.getCapacity();
+
+            try {
+                if (areaId != null && capacity != null && capacity > 0) {
+                    // ✅ Auto generate seats theo capacity
+                    seatDAO.generateSeatsForArea(areaId, capacity);
+                }
+
+                resp.setStatus(HttpServletResponse.SC_CREATED);
+                respMap.put("status", "success");
+                respMap.put("areaId", areaId);
+                out.print(gson.toJson(respMap));
+
+            } catch (Exception e) {
+                e.printStackTrace();
+                // Có thể tùy chỉnh: vẫn coi là tạo area ok, nhưng báo lỗi khi tạo ghế
+                resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                respMap.put("status", "fail");
+                respMap.put("message",
+                        "Tạo khu vực thành công nhưng lỗi khi tạo ghế: " + e.getMessage());
+                out.print(gson.toJson(respMap));
+            }
+
         } else {
             resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
             respMap.put("status", "fail");
@@ -173,7 +207,7 @@ public class VenueAreaController extends HttpServlet {
 
         PrintWriter out = resp.getWriter();
 
-        // Auth: Bearer token required and role = ADMIN
+        // Auth: Bearer token required and role = STAFF
         String auth = req.getHeader("Authorization");
         if (auth == null || !auth.startsWith("Bearer ")) {
             resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -193,11 +227,12 @@ public class VenueAreaController extends HttpServlet {
             return;
         }
         String role = JwtUtils.getRoleFromToken(token);
-        if (role == null || !"ADMIN".equalsIgnoreCase(role)) {
+        // ✅ sửa lại check role = STAFF
+        if (role == null || !"STAFF".equalsIgnoreCase(role)) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
             Map<String, Object> m3 = new HashMap<>();
             m3.put("status", "fail");
-            m3.put("message", "ADMIN role required");
+            m3.put("message", "STAFF role required");
             out.print(gson.toJson(m3));
             return;
         }
@@ -253,7 +288,7 @@ public class VenueAreaController extends HttpServlet {
 
         PrintWriter out = resp.getWriter();
 
-        // Auth: Bearer token required and role = ADMIN
+        // Auth: Bearer token required and role = STAFF
         String auth = req.getHeader("Authorization");
         if (auth == null || !auth.startsWith("Bearer ")) {
             resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -273,11 +308,11 @@ public class VenueAreaController extends HttpServlet {
             return;
         }
         String role = JwtUtils.getRoleFromToken(token);
-        if (role == null || !"ADMIN".equalsIgnoreCase(role)) {
+        if (role == null || !"STAFF".equalsIgnoreCase(role)) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
             Map<String, Object> m8 = new HashMap<>();
             m8.put("status", "fail");
-            m8.put("message", "ADMIN role required");
+            m8.put("message", "STAFF role required");
             out.print(gson.toJson(m8));
             return;
         }

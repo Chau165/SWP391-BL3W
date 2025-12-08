@@ -32,15 +32,30 @@ public class VenueAreaService {
         }
 
         String floor = area.getFloor() == null ? "" : area.getFloor();
-        boolean ok = venueAreaDAO.createArea(area.getVenueId(), area.getAreaName(), floor, area.getCapacity());
 
-        if (ok) {
-            result.put("success", true);
-            result.put("message", "Area created");
-        } else {
+        try {
+            // 👇 Gọi DAO trả về area_id mới tạo
+            int newAreaId = venueAreaDAO.createArea(
+                    area.getVenueId(),
+                    area.getAreaName(),
+                    floor,
+                    area.getCapacity()
+            );
+
+            if (newAreaId > 0) {
+                result.put("success", true);
+                result.put("message", "Area created");
+                result.put("areaId", newAreaId); // 👈 rất quan trọng: controller dùng để generate seat
+            } else {
+                result.put("success", false);
+                result.put("message", "Failed to create area");
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
             result.put("success", false);
-            result.put("message", "Failed to create area");
+            result.put("message", "Error when creating area: " + e.getMessage());
         }
+
         return result;
     }
 
