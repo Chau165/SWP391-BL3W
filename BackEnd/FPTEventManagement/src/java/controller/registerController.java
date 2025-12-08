@@ -1,11 +1,13 @@
 package controller;
 
 import DAO.UsersDAO;
+import DTO.RegisterRequest;
 import DTO.Users;
 import com.google.gson.Gson;
 import mylib.ValidationUtil;
 import utils.JwtUtils;
 import utils.PasswordUtils;
+import utils.RecaptchaUtils;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
@@ -20,15 +22,6 @@ public class registerController extends HttpServlet {
     // Helper cho Java 8 (thay cho String.isBlank)
     private static boolean isBlank(String s) {
         return s == null || s.trim().isEmpty();
-    }
-
-    // ====== DTO request chỉ dùng cho raw JSON từ FE ======
-    private static class RegisterRequest {
-
-        String fullName;
-        String phone;
-        String email;
-        String password; // mật khẩu chưa hash
     }
 
     @Override
@@ -47,7 +40,7 @@ public class registerController extends HttpServlet {
         resp.setCharacterEncoding("UTF-8");
         resp.setContentType("application/json; charset=UTF-8");
 
-        try ( BufferedReader reader = req.getReader();  PrintWriter out = resp.getWriter()) {
+        try (BufferedReader reader = req.getReader(); PrintWriter out = resp.getWriter()) {
 
             RegisterRequest input = gson.fromJson(reader, RegisterRequest.class);
 
@@ -57,23 +50,30 @@ public class registerController extends HttpServlet {
                 return;
             }
 
+            // Verify reCAPTCHA
+            if (!RecaptchaUtils.verify(input.getRecaptchaToken())) {
+                resp.setStatus(400);
+                out.print("{\"error\": \"Invalid reCAPTCHA\"}");
+                return;
+            }
+
             // ====== Validate ======
-            if (!ValidationUtil.isValidFullName(input.fullName)) {
+            if (!ValidationUtil.isValidFullName(input.getFullName())) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Full name is invalid\"}");
                 return;
             }
-            if (!ValidationUtil.isValidVNPhone(input.phone)) {
+            if (!ValidationUtil.isValidVNPhone(input.getPhone())) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Phone number is invalid\"}");
                 return;
             }
-            if (!ValidationUtil.isValidEmail(input.email)) {
+            if (!ValidationUtil.isValidEmail(input.getEmail())) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Email is invalid\"}");
                 return;
             }
-            if (!ValidationUtil.isValidPassword(input.password)) {
+            if (!ValidationUtil.isValidPassword(input.getPassword())) {
                 resp.setStatus(400);
                 out.print("{\"error\":\"Password must be at least 6 characters, include letters and digits\"}");
                 return;
@@ -82,7 +82,7 @@ public class registerController extends HttpServlet {
             UsersDAO dao = new UsersDAO();
 
             // Email đã tồn tại chưa?
-            if (dao.existsByEmail(input.email)) {
+            if (dao.existsByEmail(input.getEmail())) {
                 resp.setStatus(409);
                 out.print("{\"error\":\"Email already exists\"}");
                 return;
@@ -90,12 +90,12 @@ public class registerController extends HttpServlet {
 
             // ====== Tạo entity Users theo DB mới ======
             Users u = new Users();
-            u.setFullName(input.fullName);
-            u.setPhone(input.phone);
-            u.setEmail(input.email);
+            u.setFullName(input.getFullName());
+            u.setPhone(input.getPhone());
+            u.setEmail(input.getEmail());
 
             // Hash password trước khi lưu
-            String hash = PasswordUtils.hashPassword(input.password);
+            String hash = PasswordUtils.hashPassword(input.getPassword());
             u.setPasswordHash(hash);
 
             // Mặc định role & status
@@ -123,9 +123,9 @@ public class registerController extends HttpServlet {
 
             resp.setStatus(200);
             out.print("{"
-                    + "\"status\":\"success\","
-                    + "\"message\":\"Registered and logged in successfully\","
-                    + "\"token\":\"" + token + "\","
+                    + "\"status\":\"success\"," 
+                    + "\"message\":\"Registered and logged in successfully\"," 
+                    + "\"token\":\"" + token + "\"," 
                     + "\"user\":" + gson.toJson(newUser)
                     + "}");
         }
@@ -142,7 +142,7 @@ public class registerController extends HttpServlet {
                 || origin.contains("ngrok-free.app")
                 || // ⭐ Cho phép ngrok
                 origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
-                );
+        );
 
         if (allowed) {
             res.setHeader("Access-Control-Allow-Origin", origin);
