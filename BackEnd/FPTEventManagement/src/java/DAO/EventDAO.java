@@ -15,42 +15,41 @@ import java.util.List;
 public class EventDAO {
 
     // ================== GET ALL EVENTS (OPEN) ==================
-    public List<Event> getAllEvents() throws SQLException, ClassNotFoundException {
-        List<Event> list = new ArrayList<>();
+  public List<Event> getAllEvents() throws SQLException, ClassNotFoundException {
+    List<Event> list = new ArrayList<>();
 
-        String sql
-                = "SELECT event_id, title, description, start_time, end_time, "
-                + "       area_id, speaker_id, max_seats, status, created_by, created_at, "
-                + "       banner_url "
-                + "FROM [FPTEventManagement].[dbo].[Event] "
-                + "WHERE status = 'OPEN'";
+    String sql
+            = "SELECT event_id, title, description, start_time, end_time, "
+            + "       area_id, speaker_id, max_seats, status, created_by, created_at, "
+            + "       banner_url "
+            + "FROM [FPTEventManagement].[dbo].[Event] "
+            + "WHERE status IN ('OPEN', 'CLOSED')"; // ✅ lấy cả OPEN + CLOSED
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql);  ResultSet rs = ps.executeQuery()) {
+    try (Connection conn = DBUtils.getConnection();
+         PreparedStatement ps = conn.prepareStatement(sql);
+         ResultSet rs = ps.executeQuery()) {
 
-            while (rs.next()) {
-                Event e = new Event();
-                e.setEventId(rs.getInt("event_id"));
-                e.setTitle(rs.getString("title"));
-                e.setDescription(rs.getString("description"));
-                e.setStartTime(rs.getTimestamp("start_time"));
-                e.setEndTime(rs.getTimestamp("end_time"));
-                e.setAreaId((Integer) rs.getObject("area_id"));
-                e.setSpeakerId((Integer) rs.getObject("speaker_id"));
-                e.setMaxSeats(rs.getInt("max_seats"));
-                e.setStatus(rs.getString("status"));
-                e.setCreatedBy((Integer) rs.getObject("created_by"));
-                e.setCreatedAt(rs.getTimestamp("created_at"));
+        while (rs.next()) {
+            Event e = new Event();
+            e.setEventId(rs.getInt("event_id"));
+            e.setTitle(rs.getString("title"));
+            e.setDescription(rs.getString("description"));
+            e.setStartTime(rs.getTimestamp("start_time"));
+            e.setEndTime(rs.getTimestamp("end_time"));
+            e.setAreaId((Integer) rs.getObject("area_id"));
+            e.setSpeakerId((Integer) rs.getObject("speaker_id"));
+            e.setMaxSeats(rs.getInt("max_seats"));
+            e.setStatus(rs.getString("status"));
+            e.setCreatedBy((Integer) rs.getObject("created_by"));
+            e.setCreatedAt(rs.getTimestamp("created_at"));
+            e.setBannerUrl(rs.getString("banner_url")); // ✅ map banner_url
 
-                // ✅ map banner_url
-                e.setBannerUrl(rs.getString("banner_url"));
-
-                list.add(e);
-            }
+            list.add(e);
         }
-
-        return list;
     }
 
+    return list;
+}
     // ================== EVENT DETAIL (JOIN Venue_Area + Venue) ==================
     public EventDetailDto getEventDetail(int eventId) throws SQLException, ClassNotFoundException {
         EventDetailDto detail = null;
