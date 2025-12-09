@@ -53,10 +53,11 @@ public class GetMyEventRequestsController extends HttpServlet {
             return;
         }
 
-        // ===== 2. Lấy list request của student =====
+        // ===== 2. Lấy list request của organizer =====
+        // DAO đã join thêm tên người duyệt (processedByName)
         List<EventRequest> list = eventRequestDAO.getRequestsByStudent(userId);
 
-        // Trả về json list luôn
+        // Trả về json list luôn (gồm: requesterName, processedByName, ...)
         String json = gson.toJson(list);
         out.print(json);
     }
