@@ -18,7 +18,7 @@ public class RecaptchaUtils {
 
     // Run this on Backend Terminal
     // $env:RECAPTCHA_SECRET = 'SECRET_KEY'
-    private static final String SECRET = System.getenv("RECAPTCHA_SECRET"); 
+    private static final String SECRET = "RECAPTCHA_SECRET"; 
     private static final String VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
 
     public static boolean verify(String gRecaptchaResponse) {
@@ -88,4 +88,5 @@ public class RecaptchaUtils {
         List<String> errorCodes;
     }
 }
+
 
