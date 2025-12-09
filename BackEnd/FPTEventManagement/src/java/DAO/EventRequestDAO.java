@@ -67,12 +67,21 @@ public class EventRequestDAO {
         List<EventRequest> list = new ArrayList<>();
 
         String sql
-                = "SELECT er.request_id, er.requester_id, u.full_name AS requester_name, "
-                + "       er.title, er.description, er.preferred_start_time, er.preferred_end_time, "
-                + "       er.expected_capacity, er.status, er.created_at, er.processed_by, "
-                + "       er.processed_at, er.organizer_note, er.created_event_id "
+                = "SELECT er.request_id, "
+                + "       er.requester_id, "
+                + "       uReq.full_name AS requester_name, "
+                + "       er.title, er.description, "
+                + "       er.preferred_start_time, er.preferred_end_time, "
+                + "       er.expected_capacity, er.status, "
+                + "       er.created_at, "
+                + "       er.processed_by, "
+                + "       er.processed_at, "
+                + "       er.organizer_note, "
+                + "       er.created_event_id, "
+                + "       uStaff.full_name AS processed_by_name " // ✅ tên người duyệt
                 + "FROM Event_Request er "
-                + "JOIN Users u ON er.requester_id = u.user_id "
+                + "JOIN Users uReq ON er.requester_id = uReq.user_id "
+                + "LEFT JOIN Users uStaff ON er.processed_by = uStaff.user_id "
                 + "WHERE er.requester_id = ? "
                 + "ORDER BY er.created_at DESC";
 
@@ -81,7 +90,7 @@ public class EventRequestDAO {
             ps.setInt(1, requesterId);
             try ( ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
-                    list.add(mapRow(rs));
+                    list.add(mapRow(rs));   // ✅ mapRow sẽ đọc thêm processed_by_name
                 }
             }
         } catch (Exception e) {
@@ -91,7 +100,7 @@ public class EventRequestDAO {
         return list;
     }
 
-    // Lấy tất cả request đang PENDING cho ORGANIZER xem
+    // Lấy tất cả request (PENDING / APPROVED / REJECTED) cho STAFF/ADMIN xem
     public List<EventRequest> getPendingRequests() {
         List<EventRequest> list = new ArrayList<>();
 
@@ -101,7 +110,7 @@ public class EventRequestDAO {
                 + "er.processed_at, er.organizer_note, er.created_event_id "
                 + "FROM Event_Request er "
                 + "JOIN Users u ON er.requester_id = u.user_id "
-                + "WHERE er.status = 'PENDING' "
+                + "WHERE er.status IN ('PENDING', 'APPROVED', 'REJECTED') " // ✅ lấy cả 3 trạng thái
                 + "ORDER BY er.created_at ASC";
 
         try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql);  ResultSet rs = ps.executeQuery()) {
@@ -378,64 +387,66 @@ public class EventRequestDAO {
     }
 
     // ======================= THÊM MỚI: LẤY REQUEST THEO created_event_id =======================
-public EventRequest getByCreatedEventId(int eventId) {
-    String sql = "SELECT " +
-            "er.request_id, " +
-            "er.requester_id, " +
-            "er.title, " +
-            "er.description, " +
-            "er.preferred_start_time, " +
-            "er.preferred_end_time, " +
-            "er.expected_capacity, " +
-            "er.status, " +
-            "er.created_at, " +
-            "er.processed_by, " +
-            "er.processed_at, " +
-            "er.organizer_note, " +
-            "er.created_event_id, " +
-            "u.full_name AS requester_name " +   // ✅ lấy tên người gửi
-            "FROM Event_Request er " +
-            "JOIN Users u ON er.requester_id = u.user_id " + // ✅ đúng tên bảng: Users
-            "WHERE er.created_event_id = ?";
+    public EventRequest getByCreatedEventId(int eventId) {
+        String sql = "SELECT "
+                + "er.request_id, "
+                + "er.requester_id, "
+                + "er.title, "
+                + "er.description, "
+                + "er.preferred_start_time, "
+                + "er.preferred_end_time, "
+                + "er.expected_capacity, "
+                + "er.status, "
+                + "er.created_at, "
+                + "er.processed_by, "
+                + "er.processed_at, "
+                + "er.organizer_note, "
+                + "er.created_event_id, "
+                + "u.full_name AS requester_name "
+                + // ✅ lấy tên người gửi
+                "FROM Event_Request er "
+                + "JOIN Users u ON er.requester_id = u.user_id "
+                + // ✅ đúng tên bảng: Users
+                "WHERE er.created_event_id = ?";
 
-    try (Connection conn = DBUtils.getConnection();
-         PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
-        ps.setInt(1, eventId);
+            ps.setInt(1, eventId);
 
-        try (ResultSet rs = ps.executeQuery()) {
-            if (rs.next()) {
-                return mapRow(rs);
+            try ( ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return mapRow(rs);
+                }
             }
+        } catch (Exception e) {
+            System.err.println("[ERROR] getByCreatedEventId: " + e.getMessage());
+            e.printStackTrace();
         }
-    } catch (Exception e) {
-        System.err.println("[ERROR] getByCreatedEventId: " + e.getMessage());
-        e.printStackTrace();
+        return null;
     }
-    return null;
-}
 
     // ======================= MAP ROW =======================
     private EventRequest mapRow(ResultSet rs) throws SQLException {
-        EventRequest er = new EventRequest();
-        er.setRequestId(rs.getInt("request_id"));
-        er.setRequesterId(rs.getInt("requester_id"));
+        EventRequest r = new EventRequest();
+        r.setRequestId(rs.getInt("request_id"));
+        r.setRequesterId(rs.getInt("requester_id"));
+        r.setRequesterName(rs.getString("requester_name"));
+        r.setTitle(rs.getString("title"));
+        r.setDescription(rs.getString("description"));
+        r.setPreferredStartTime(rs.getTimestamp("preferred_start_time"));
+        r.setPreferredEndTime(rs.getTimestamp("preferred_end_time"));
+        r.setExpectedCapacity(rs.getInt("expected_capacity"));
+        r.setStatus(rs.getString("status"));
+        r.setCreatedAt(rs.getTimestamp("created_at"));
+        r.setProcessedBy((Integer) rs.getObject("processed_by"));
+        r.setProcessedAt(rs.getTimestamp("processed_at"));
+        r.setOrganizerNote(rs.getString("organizer_note"));
+        r.setCreatedEventId((Integer) rs.getObject("created_event_id"));
 
-        // ✅ set thêm tên người gửi
-        er.setRequesterName(rs.getString("requester_name"));
+        // ✅ THÊM DÒNG NÀY: tên người duyệt
+        r.setProcessedByName(rs.getString("processed_by_name"));
 
-        er.setTitle(rs.getString("title"));
-        er.setDescription(rs.getString("description"));
-        er.setPreferredStartTime(rs.getTimestamp("preferred_start_time"));
-        er.setPreferredEndTime(rs.getTimestamp("preferred_end_time"));
-        er.setExpectedCapacity((Integer) rs.getObject("expected_capacity"));
-        er.setStatus(rs.getString("status"));
-        er.setCreatedAt(rs.getTimestamp("created_at"));
-        er.setProcessedBy((Integer) rs.getObject("processed_by"));
-        er.setProcessedAt(rs.getTimestamp("processed_at"));
-        er.setOrganizerNote(rs.getString("organizer_note"));
-        er.setCreatedEventId((Integer) rs.getObject("created_event_id"));
-        return er;
+        return r;
     }
 
 }
