@@ -29,6 +29,13 @@ public class RecaptchaUtils {
         }
 
         try {
+            // Debug: log whether secret is present in environment (do NOT print the secret value)
+            try {
+                System.out.println("[RecaptchaUtils] RECAPTCHA_SECRET present: " + (SECRET != null && !SECRET.isEmpty()));
+            } catch (Throwable t) {
+                // ignore logging issues
+            }
+
             String params = "secret=" + URLEncoder.encode(SECRET, "UTF-8")
                     + "&response=" + URLEncoder.encode(gRecaptchaResponse, "UTF-8");
 
@@ -48,6 +55,15 @@ public class RecaptchaUtils {
 
             try (InputStreamReader reader = new InputStreamReader(is, "UTF-8")) {
                 RecaptchaResponse resp = new Gson().fromJson(reader, RecaptchaResponse.class);
+                try {
+                    if (resp != null) {
+                        System.out.println("[RecaptchaUtils] verify result: success=" + resp.success + ", errorCodes=" + resp.errorCodes);
+                    } else {
+                        System.out.println("[RecaptchaUtils] verify result: null response from Google");
+                    }
+                } catch (Throwable t) {
+                    // ignore logging
+                }
                 return resp != null && resp.success;
             }
 
