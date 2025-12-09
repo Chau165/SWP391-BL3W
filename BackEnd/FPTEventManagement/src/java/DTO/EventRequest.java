@@ -5,7 +5,7 @@ import java.sql.Timestamp;
 public class EventRequest {
     private Integer requestId;
     private Integer requesterId;
-    private String requesterName;   // ✅ THÊM MỚI
+    private String requesterName;   // tên người tạo request (Organizer)
     private String title;
     private String description;
     private Timestamp preferredStartTime;
@@ -13,7 +13,9 @@ public class EventRequest {
     private Integer expectedCapacity;
     private String status;
     private Timestamp createdAt;
-    private Integer processedBy;
+
+    private Integer processedBy;      // id người duyệt (Staff/Admin)
+    private String processedByName;   // ✅ tên người duyệt
     private Timestamp processedAt;
     private String organizerNote;
     private Integer createdEventId;
@@ -24,7 +26,6 @@ public class EventRequest {
     public Integer getRequesterId() { return requesterId; }
     public void setRequesterId(Integer requesterId) { this.requesterId = requesterId; }
 
-    // ✅ getter/setter mới
     public String getRequesterName() { return requesterName; }
     public void setRequesterName(String requesterName) { this.requesterName = requesterName; }
 
@@ -51,6 +52,9 @@ public class EventRequest {
 
     public Integer getProcessedBy() { return processedBy; }
     public void setProcessedBy(Integer processedBy) { this.processedBy = processedBy; }
+
+    public String getProcessedByName() { return processedByName; }
+    public void setProcessedByName(String processedByName) { this.processedByName = processedByName; }
 
     public Timestamp getProcessedAt() { return processedAt; }
     public void setProcessedAt(Timestamp processedAt) { this.processedAt = processedAt; }
