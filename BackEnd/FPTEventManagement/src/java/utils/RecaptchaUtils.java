@@ -13,32 +13,23 @@ import java.util.List;
 
 public class RecaptchaUtils {
 
-    // Load reCAPTCHA secret from environment variable to avoid committing secrets in source code.
-    // Set the environment variable `RECAPTCHA_SECRET` on your server or in your runtime environment.
+    // HARD-CODE SECRET KEY (KHÔNG DÙNG ENV NỮA)
+    private static final String SECRET = "6LcRNiUsAAAAAKNO9NSyTJsrundQeosl7z3RDIUt";
 
-    // Run this on Backend Terminal
-    // $env:RECAPTCHA_SECRET = 'SECRET_KEY'
-    private static final String SECRET = "RECAPTCHA_SECRET"; 
     private static final String VERIFY_URL = "https://www.google.com/recaptcha/api/siteverify";
 
     public static boolean verify(String gRecaptchaResponse) {
         if (gRecaptchaResponse == null || gRecaptchaResponse.trim().isEmpty()) {
+            System.err.println("[reCAPTCHA] Missing token from client");
             return false;
         }
 
-        // Bypass for testing in Swagger / local development
-        if ("TEST_BYPASS".equals(gRecaptchaResponse)) {
-            return true;
+        if (SECRET == null || SECRET.trim().isEmpty()) {
+            System.err.println("[reCAPTCHA] SECRET key missing (null or empty)");
+            return false;
         }
 
         try {
-            // Debug: log whether secret is present in environment (do NOT print the secret value)
-            try {
-                System.out.println("[RecaptchaUtils] RECAPTCHA_SECRET present: " + (SECRET != null && !SECRET.isEmpty()));
-            } catch (Throwable t) {
-                // ignore logging issues
-            }
-
             String params = "secret=" + URLEncoder.encode(SECRET, "UTF-8")
                     + "&response=" + URLEncoder.encode(gRecaptchaResponse, "UTF-8");
 
@@ -54,24 +45,28 @@ public class RecaptchaUtils {
             }
 
             int status = conn.getResponseCode();
-            InputStream is = (status >= 200 && status < 300) ? conn.getInputStream() : conn.getErrorStream();
+            InputStream is = (status >= 200 && status < 300)
+                    ? conn.getInputStream()
+                    : conn.getErrorStream();
 
             try (InputStreamReader reader = new InputStreamReader(is, "UTF-8")) {
                 RecaptchaResponse resp = new Gson().fromJson(reader, RecaptchaResponse.class);
-                try {
-                    if (resp != null) {
-                        System.out.println("[RecaptchaUtils] verify result: success=" + resp.success + ", errorCodes=" + resp.errorCodes);
-                    } else {
-                        System.out.println("[RecaptchaUtils] verify result: null response from Google");
-                    }
-                } catch (Throwable t) {
-                    // ignore logging
+
+                if (resp == null) {
+                    System.err.println("[reCAPTCHA] Empty response from Google");
+                    return false;
                 }
-                return resp != null && resp.success;
+
+                if (!resp.success && resp.errorCodes != null) {
+                    System.err.println("[reCAPTCHA] Verify failed. Error codes: " + resp.errorCodes);
+                }
+
+                return resp.success;
             }
 
         } catch (Exception e) {
             e.printStackTrace();
+            System.err.println("[reCAPTCHA] Exception while verifying token: " + e.getMessage());
             return false;
         }
     }
@@ -88,5 +83,3 @@ public class RecaptchaUtils {
         List<String> errorCodes;
     }
 }
-
-
