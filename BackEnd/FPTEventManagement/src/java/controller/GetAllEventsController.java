@@ -4,7 +4,7 @@ import DAO.EventDAO;
 import DTO.Event;
 import DTO.EventListDto;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;   // ✅ IMPORT
+import com.google.gson.GsonBuilder;
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
@@ -12,7 +12,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
+import java.util.HashMap;   // ✅ thêm
 import java.util.List;
+import java.util.Map;      // ✅ thêm
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -20,9 +22,8 @@ import java.util.logging.Logger;
 public class GetAllEventsController extends HttpServlet {
 
     private final EventDAO eventDAO = new EventDAO();
-    // ✅ Dùng GsonBuilder và serializeNulls
     private final Gson gson = new GsonBuilder()
-            .serializeNulls() // => field = null vẫn xuất hiện trong JSON
+            .serializeNulls()
             .create();
 
     @Override
@@ -40,18 +41,19 @@ public class GetAllEventsController extends HttpServlet {
         String role = (String) request.getAttribute("role");
         if (!isAllowedRole(role)) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            try ( PrintWriter out = response.getWriter()) {
+            try (PrintWriter out = response.getWriter()) {
                 out.write("{\"message\":\"Forbidden: your role is not allowed to access this resource\"}");
             }
             return;
         }
 
-        // ===== 2. Gọi DAO lấy danh sách Event =====
+        // ===== 2. Gọi DAO lấy danh sách Event (OPEN + CLOSED) =====
         try {
             List<Event> events = eventDAO.getAllEvents();
 
-            // Map sang EventListDto để loại bỏ field nhạy cảm
-            List<EventListDto> result = new ArrayList<>();
+            List<EventListDto> openEvents = new ArrayList<>();
+            List<EventListDto> closedEvents = new ArrayList<>();
+
             for (Event e : events) {
                 EventListDto dto = new EventListDto(
                         e.getEventId(),
@@ -61,21 +63,30 @@ public class GetAllEventsController extends HttpServlet {
                         e.getEndTime(),
                         e.getMaxSeats(),
                         e.getStatus(),
-                        e.getBannerUrl() // ✅ map bannerUrl ra cho FE
+                        e.getBannerUrl()
                 );
-                result.add(dto);
+
+                if ("OPEN".equalsIgnoreCase(e.getStatus())) {
+                    openEvents.add(dto);
+                } else if ("CLOSED".equalsIgnoreCase(e.getStatus())) {
+                    closedEvents.add(dto);
+                }
             }
 
-            // ===== 3. Trả JSON =====
+            // ===== 3. Gói lại thành object có 2 field =====
+            Map<String, Object> result = new HashMap<>();
+            result.put("openEvents", openEvents);
+            result.put("closedEvents", closedEvents);
+
             String json = gson.toJson(result);
-            try ( PrintWriter out = response.getWriter()) {
+            try (PrintWriter out = response.getWriter()) {
                 out.write(json);
             }
 
         } catch (SQLException ex) {
             ex.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            try ( PrintWriter out = response.getWriter()) {
+            try (PrintWriter out = response.getWriter()) {
                 out.write("{\"message\":\"Internal server error when loading events\"}");
             }
         } catch (ClassNotFoundException ex) {
@@ -122,5 +133,4 @@ public class GetAllEventsController extends HttpServlet {
         res.setHeader("Access-Control-Expose-Headers", "Authorization");
         res.setHeader("Access-Control-Max-Age", "86400");
     }
-
 }
