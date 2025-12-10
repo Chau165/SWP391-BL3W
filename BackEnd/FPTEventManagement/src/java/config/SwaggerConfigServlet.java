@@ -1035,7 +1035,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "\"phone\":{\"type\":\"string\",\"example\":\"string\"},"
                 + "\"email\":{\"type\":\"string\",\"example\":\"string\"},"
                 + "\"password\":{\"type\":\"string\",\"format\":\"password\",\"example\":\"string\"},"
-                + "\"recaptchaToken\":{\"type\":\"string\",\"description\":\"Token từ Google\",\"example\":\"string\"}"
+                + "\"recaptchaToken\":{\"type\":\"string\",\"description\":\"Token từ Google\",\"example\":\"TEST_BYPASS\"}"
                 + "},\"required\":[\"fullName\",\"phone\",\"email\",\"password\"]},"
                 // VerifyOtpRequest
                 + "\"VerifyOtpRequest\":{"
