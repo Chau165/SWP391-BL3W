@@ -91,6 +91,16 @@ public class JwtAuthFilter implements Filter {
             return true;
         }
 
+        // ✅ PUBLIC: danh sách sự kiện cho Guest (không cần đăng nhập)
+        if (path.equals("/api/events")) {
+            return true;
+        }
+
+        // ✅ (TUỲ CHỌN) nếu muốn Guest xem luôn chi tiết sự kiện
+        if (path.equals("/api/events/detail")) {
+            return true;
+        }
+
         // Swagger & OpenAPI
         if (path.equals("/api/openapi.json")) {
             return true;

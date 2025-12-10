@@ -4,6 +4,7 @@ import DAO.EventRequestDAO;
 import DTO.EventRequest;
 import com.google.gson.Gson;
 import utils.JwtUtils;
+import utils.InMemoryNotificationService;   // ✅ THÊM IMPORT
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
@@ -59,7 +60,7 @@ public class ProcessEventRequestController extends HttpServlet {
         if (userId == null || role == null ||
                 !( "STAFF".equalsIgnoreCase(role) || "ADMIN".equalsIgnoreCase(role) )) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            out.print("{\"status\":\"fail\",\"message\":\"Chỉ ORGANIZER hoặc ADMIN được duyệt request\"}");
+            out.print("{\"status\":\"fail\",\"message\":\"Chỉ STAFF hoặc ADMIN được duyệt request\"}");
             return;
         }
 
@@ -110,7 +111,7 @@ public class ProcessEventRequestController extends HttpServlet {
     // ======================== HANDLE APPROVE ========================
     private void handleApprove(EventRequest reqObj,
                                ProcessBody body,
-                               int organizerId,
+                               int staffId,
                                HttpServletResponse resp,
                                PrintWriter out) throws IOException {
 
@@ -141,7 +142,7 @@ public class ProcessEventRequestController extends HttpServlet {
         // APPROVE + TẠO EVENT (transaction trong DAO)
         Integer newEventId = eventRequestDAO.approveRequestAndCreateEvent(
                 reqObj,
-                organizerId,
+                staffId,
                 body.areaId,
                 body.organizerNote
         );
@@ -152,6 +153,17 @@ public class ProcessEventRequestController extends HttpServlet {
             return;
         }
 
+        // ✅ TẠO NOTIFICATION CHO ORGANIZER (người gửi request)
+        Integer requesterId = reqObj.getRequesterId();  // giả sử EventRequest có field này
+        if (requesterId != null) {
+            String title = "Yêu cầu sự kiện đã được duyệt";
+            String content = "Yêu cầu tổ chức sự kiện \"" + reqObj.getTitle() + "\" của bạn đã được duyệt.";
+            // Link FE: tùy bạn map, có thể dẫn tới chi tiết event mới tạo
+            String linkUrl = "/events/" + newEventId; // hoặc "/organizer/event-requests/" + reqObj.getRequestId()
+
+            InMemoryNotificationService.addNotification(requesterId, title, content, linkUrl);
+        }
+
         resp.setStatus(HttpServletResponse.SC_OK);
         out.print("{\"status\":\"success\",\"message\":\"Đã APPROVE request và tạo Event thành công\",\"eventId\":" + newEventId + "}");
     }
@@ -159,17 +171,26 @@ public class ProcessEventRequestController extends HttpServlet {
     // ======================== HANDLE REJECT ========================
     private void handleReject(EventRequest reqObj,
                               ProcessBody body,
-                              int organizerId,
+                              int staffId,
                               HttpServletResponse resp,
                               PrintWriter out) {
 
-        // Cho phép organizerNote rỗng, nhưng bạn có thể ép không rỗng nếu muốn
-        boolean ok = eventRequestDAO.rejectRequest(reqObj.getRequestId(), organizerId, body.organizerNote);
+        boolean ok = eventRequestDAO.rejectRequest(reqObj.getRequestId(), staffId, body.organizerNote);
 
         if (!ok) {
             resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
             out.print("{\"status\":\"error\",\"message\":\"Không thể cập nhật trạng thái REJECTED\"}");
             return;
+        }
+
+        // ✅ TẠO NOTIFICATION CHO ORGANIZER KHI BỊ TỪ CHỐI
+        Integer requesterId = reqObj.getRequesterId();
+        if (requesterId != null) {
+            String title = "Yêu cầu sự kiện bị từ chối";
+            String content = "Yêu cầu tổ chức sự kiện \"" + reqObj.getTitle() + "\" của bạn đã bị từ chối.";
+            String linkUrl = "/organizer/event-requests/" + reqObj.getRequestId();
+
+            InMemoryNotificationService.addNotification(requesterId, title, content, linkUrl);
         }
 
         resp.setStatus(HttpServletResponse.SC_OK);

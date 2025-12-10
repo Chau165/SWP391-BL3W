@@ -12,9 +12,9 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.sql.SQLException;
 import java.util.ArrayList;
-import java.util.HashMap;   // ✅ thêm
+import java.util.HashMap;
 import java.util.List;
-import java.util.Map;      // ✅ thêm
+import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -37,18 +37,11 @@ public class GetAllEventsController extends HttpServlet {
         setCorsHeaders(response, request);
         response.setContentType("application/json;charset=UTF-8");
 
-        // ===== 1. Lấy role từ request (JWT Filter đã set trước đó) =====
-        String role = (String) request.getAttribute("role");
-        if (!isAllowedRole(role)) {
-            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            try ( PrintWriter out = response.getWriter()) {
-                out.write("{\"message\":\"Forbidden: your role is not allowed to access this resource\"}");
-            }
-            return;
-        }
+        // ❌ BỎ HOÀN TOÀN CHECK JWT / ROLE
+        // ==> Guest không cần đăng nhập vẫn xem được list event
 
-        // ===== 2. Gọi DAO lấy danh sách Event (OPEN + CLOSED) =====
         try {
+            // 1) Lấy danh sách Event (OPEN + CLOSED) từ DAO
             List<Event> events = eventDAO.getAllEvents();
 
             List<EventListDto> openEvents = new ArrayList<>();
@@ -66,12 +59,12 @@ public class GetAllEventsController extends HttpServlet {
                         e.getBannerUrl()
                 );
 
-                // ✅ Map thêm khu vực
+                // Map thêm khu vực
                 dto.setAreaId(e.getAreaId());
                 dto.setAreaName(e.getAreaName());
                 dto.setFloor(e.getFloor());
 
-                // ✅ Map thêm địa điểm
+                // Map thêm địa điểm
                 dto.setVenueName(e.getVenueName());
                 dto.setVenueLocation(e.getVenueLocation());
 
@@ -82,39 +75,24 @@ public class GetAllEventsController extends HttpServlet {
                 }
             }
 
-            // ===== 3. Gói lại thành object có 2 field =====
+            // 2) Đóng gói JSON: { openEvents: [...], closedEvents: [...] }
             Map<String, Object> result = new HashMap<>();
             result.put("openEvents", openEvents);
             result.put("closedEvents", closedEvents);
 
             String json = gson.toJson(result);
-            try ( PrintWriter out = response.getWriter()) {
+            try (PrintWriter out = response.getWriter()) {
                 out.write(json);
             }
 
         } catch (SQLException ex) {
             ex.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            try ( PrintWriter out = response.getWriter()) {
+            try (PrintWriter out = response.getWriter()) {
                 out.write("{\"message\":\"Internal server error when loading events\"}");
             }
         } catch (ClassNotFoundException ex) {
             Logger.getLogger(GetAllEventsController.class.getName()).log(Level.SEVERE, null, ex);
-        }
-    }
-
-    private boolean isAllowedRole(String role) {
-        if (role == null) {
-            return false;
-        }
-        switch (role) {
-            case "STUDENT":
-            case "ORGANIZER":
-            case "STAFF":
-            case "ADMIN":
-                return true;
-            default:
-                return false;
         }
     }
 

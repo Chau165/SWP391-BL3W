@@ -3,7 +3,7 @@ package controller;
 import DAO.EventDAO;
 import DTO.EventDetailDto;
 import com.google.gson.Gson;
-import com.google.gson.GsonBuilder;   // ✅ IMPORT
+import com.google.gson.GsonBuilder;
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
@@ -15,7 +15,8 @@ import java.sql.SQLException;
 public class GetEventDetailController extends HttpServlet {
 
     private final EventDAO eventDAO = new EventDAO();
-    // ✅ Cho detail cũng serialize null để bannerUrl luôn có trong JSON
+
+    // ✅ Serialize null để bannerUrl luôn xuất hiện
     private final Gson gson = new GsonBuilder()
             .serializeNulls()
             .create();
@@ -23,13 +24,17 @@ public class GetEventDetailController extends HttpServlet {
     @Override
     protected void doGet(HttpServletRequest request, HttpServletResponse response)
             throws IOException {
+
         setCorsHeaders(response, request);
         response.setContentType("application/json;charset=UTF-8");
 
+        // ✅ KHÔNG đọc JWT / role / userId
+        // ✅ Guest có thể truy cập
+
         String idParam = request.getParameter("id");
-        if (idParam == null) {
+        if (idParam == null || idParam.trim().isEmpty()) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            try ( PrintWriter out = response.getWriter()) {
+            try (PrintWriter out = response.getWriter()) {
                 out.write("{\"message\":\"Missing event id\"}");
             }
             return;
@@ -41,42 +46,43 @@ public class GetEventDetailController extends HttpServlet {
             EventDetailDto detail = eventDAO.getEventDetail(eventId);
             if (detail == null) {
                 response.setStatus(HttpServletResponse.SC_NOT_FOUND);
-                try ( PrintWriter out = response.getWriter()) {
-                    out.write("{\"message\":\"Event not found or not open\"}");
+                try (PrintWriter out = response.getWriter()) {
+                    out.write("{\"message\":\"Event not found\"}");
                 }
                 return;
             }
 
             String json = gson.toJson(detail);
-            try ( PrintWriter out = response.getWriter()) {
+            try (PrintWriter out = response.getWriter()) {
                 out.write(json);
             }
 
         } catch (NumberFormatException ex) {
             response.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            try ( PrintWriter out = response.getWriter()) {
+            try (PrintWriter out = response.getWriter()) {
                 out.write("{\"message\":\"Invalid event id\"}");
             }
         } catch (SQLException | ClassNotFoundException ex) {
             ex.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            try ( PrintWriter out = response.getWriter()) {
+            try (PrintWriter out = response.getWriter()) {
                 out.write("{\"message\":\"Error loading event detail\"}");
             }
         }
     }
 
+    // ==================== CORS ====================
     private void setCorsHeaders(HttpServletResponse res, HttpServletRequest req) {
         String origin = req.getHeader("Origin");
 
-        boolean allowed = origin != null && (origin.equals("http://localhost:5173")
-                || origin.equals("http://127.0.0.1:5173")
-                || origin.equals("http://localhost:3000")
-                || origin.equals("http://127.0.0.1:3000")
-                || origin.contains("ngrok-free.app")
-                || // ⭐ Cho phép ngrok
-                origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
-                );
+        boolean allowed = origin != null && (
+                origin.equals("http://localhost:5173")
+                        || origin.equals("http://127.0.0.1:5173")
+                        || origin.equals("http://localhost:3000")
+                        || origin.equals("http://127.0.0.1:3000")
+                        || origin.contains("ngrok-free.app")
+                        || origin.contains("ngrok.app")
+        );
 
         if (allowed) {
             res.setHeader("Access-Control-Allow-Origin", origin);
@@ -86,11 +92,9 @@ public class GetEventDetailController extends HttpServlet {
         }
 
         res.setHeader("Vary", "Origin");
-        res.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+        res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
         res.setHeader("Access-Control-Allow-Headers",
                 "Content-Type, Authorization, ngrok-skip-browser-warning");
-        res.setHeader("Access-Control-Expose-Headers", "Authorization");
         res.setHeader("Access-Control-Max-Age", "86400");
     }
-
 }

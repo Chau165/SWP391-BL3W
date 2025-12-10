@@ -69,7 +69,7 @@ public class BuyTicketController extends HttpServlet {
             List<String> fieldNames = new ArrayList<>(vnp_Params.keySet());
             Collections.sort(fieldNames);
             StringBuilder hashData = new StringBuilder();
-            for (Iterator<String> itr = fieldNames.iterator(); itr.hasNext(); ) {
+            for (Iterator<String> itr = fieldNames.iterator(); itr.hasNext();) {
                 String fieldName = itr.next();
                 String fieldValue = vnp_Params.get(fieldName);
                 if (fieldValue != null && !fieldValue.isEmpty()) {
@@ -139,53 +139,31 @@ public class BuyTicketController extends HttpServlet {
                 return;
             }
 
-            // ===== 7. Tạo Ticket (Idempotency Check) =====
+            // ===== 7. Tạo Ticket (MỖI LẦN THANH TOÁN TẠO 1 VÉ MỚI) =====
             TicketDAO ticketDAO = new TicketDAO();
-            int existingTicketId = ticketDAO.getTicketId(eventId, userId, categoryTicketId);
             int ticketId;
-            boolean ticketAlreadyExisted = false;
 
-            if (existingTicketId > 0) {
-                ticketId = existingTicketId;
-                ticketAlreadyExisted = true;
-                System.out.println("⚠️ Vé đã tồn tại (Ticket ID: " + ticketId + ").");
-            } else {
-                Ticket ticket = new Ticket();
-                ticket.setEventId(eventId);
-                ticket.setUserId(userId);
-                ticket.setCategoryTicketId(categoryTicketId);
-                ticket.setBillId(billId);
-                ticket.setSeatId(seatId);
-                ticket.setStatus("BOOKED");
-                ticket.setQrIssuedAt(new Timestamp(System.currentTimeMillis()));
+            Ticket ticket = new Ticket();
+            ticket.setEventId(eventId);
+            ticket.setUserId(userId);
+            ticket.setCategoryTicketId(categoryTicketId);
+            ticket.setBillId(billId);
+            ticket.setSeatId(seatId);
+            ticket.setStatus("BOOKED");
+            ticket.setQrIssuedAt(new Timestamp(System.currentTimeMillis()));
 
-                ticketId = ticketDAO.insertTicketAndReturnId(ticket);
-                if (ticketId <= 0) {
-                    int recheck = ticketDAO.getTicketId(eventId, userId, categoryTicketId);
-                    if (recheck > 0) {
-                        ticketId = recheck;
-                        ticketAlreadyExisted = true;
-                    } else {
-                        System.out.println("⚠️ Lỗi tạo vé vào database.");
-                        redirectToResult(resp, "failed", "ticket_failed", null);
-                        return;
-                    }
-                }
+            ticketId = ticketDAO.insertTicketAndReturnId(ticket);
+            if (ticketId <= 0) {
+                System.out.println("⚠️ Lỗi tạo vé vào database.");
+                redirectToResult(resp, "failed", "ticket_failed", null);
+                return;
             }
 
-            // ===== 7.1. Cập nhật QR Code =====
+            // ===== 7.1. Cập nhật QR Code cho vé mới =====
             String qrBase64 = null;
             try {
-                if (ticketAlreadyExisted) {
-                    Ticket existing = ticketDAO.getTicketById(ticketId);
-                    if (existing != null && existing.getQrCodeValue() != null) {
-                        qrBase64 = existing.getQrCodeValue();
-                    }
-                }
-                if (qrBase64 == null) {
-                    qrBase64 = QRCodeUtil.generateTicketQrBase64(ticketId, 300, 300);
-                    ticketDAO.updateTicketQr(ticketId, qrBase64);
-                }
+                qrBase64 = QRCodeUtil.generateTicketQrBase64(ticketId, 300, 300);
+                ticketDAO.updateTicketQr(ticketId, qrBase64);
             } catch (Exception ex) {
                 System.err.println("QR Gen Error: " + ex.getMessage());
                 // không fail giao dịch, chỉ log
