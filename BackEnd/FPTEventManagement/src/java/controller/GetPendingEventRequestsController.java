@@ -3,18 +3,24 @@ package controller;
 import DAO.EventRequestDAO;
 import DTO.EventRequest;
 import com.google.gson.Gson;
-import utils.JwtUtils;
+import com.google.gson.GsonBuilder;  // ✅ dùng GsonBuilder
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.*;
 import java.util.List;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Map;
+import utils.JwtUtils;
 
 @WebServlet("/api/staff/event-requests")
 public class GetPendingEventRequestsController extends HttpServlet {
 
     private final EventRequestDAO eventRequestDAO = new EventRequestDAO();
-    private final Gson gson = new Gson();
+    private final Gson gson = new GsonBuilder()
+            .serializeNulls()   // ✅ giữ cả field null
+            .create();
 
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -47,14 +53,34 @@ public class GetPendingEventRequestsController extends HttpServlet {
         String role = JwtUtils.getRoleFromToken(token);
         if (role == null || (!"STAFF".equalsIgnoreCase(role) && !"ADMIN".equalsIgnoreCase(role))) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            out.print("{\"status\":\"fail\",\"message\":\"Chỉ STAFF/ADMIN mới xem được danh sách request PENDING\"}");
+            out.print("{\"status\":\"fail\",\"message\":\"Chỉ STAFF/ADMIN mới xem được danh sách request\"}");
             return;
         }
 
-        // ===== 2. Lấy list PENDING =====
-        List<EventRequest> list = eventRequestDAO.getPendingRequests();
+        // ===== 2. Lấy list tất cả request (PENDING / APPROVED / REJECTED) =====
+        List<EventRequest> all = eventRequestDAO.getPendingRequests();
 
-        String json = gson.toJson(list);
+        List<EventRequest> pending = new ArrayList<>();
+        List<EventRequest> approved = new ArrayList<>();
+        List<EventRequest> rejected = new ArrayList<>();
+
+        for (EventRequest r : all) {
+            if ("PENDING".equalsIgnoreCase(r.getStatus())) {
+                pending.add(r);
+            } else if ("APPROVED".equalsIgnoreCase(r.getStatus())) {
+                approved.add(r);
+            } else if ("REJECTED".equalsIgnoreCase(r.getStatus())) {
+                rejected.add(r);
+            }
+        }
+
+        // ===== 3. Gói lại thành object có 3 field =====
+        Map<String, Object> result = new HashMap<>();
+        result.put("pending", pending);
+        result.put("approved", approved);
+        result.put("rejected", rejected);
+
+        String json = gson.toJson(result);
         out.print(json);
     }
 

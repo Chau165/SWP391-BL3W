@@ -191,6 +191,27 @@ public class TicketDAO {
         }
         return null;
     }
+    
+    /**
+     * Get ticket id by event + user + category. Return 0 if not found.
+     */
+    public int getTicketId(int eventId, int userId, int categoryId) {
+        String sql = "SELECT ticket_id FROM Ticket WHERE event_id = ? AND user_id = ? AND category_ticket_id = ?";
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, eventId);
+            ps.setInt(2, userId);
+            ps.setInt(3, categoryId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt("ticket_id");
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ERROR] getTicketId: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return 0;
+    }
 
     // Check-in ticket: chỉ cho update nếu đang BOOKED
     public boolean checkinTicket(int ticketId, Timestamp checkinTime) {

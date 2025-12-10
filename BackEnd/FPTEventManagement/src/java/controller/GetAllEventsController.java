@@ -41,7 +41,7 @@ public class GetAllEventsController extends HttpServlet {
         String role = (String) request.getAttribute("role");
         if (!isAllowedRole(role)) {
             response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            try (PrintWriter out = response.getWriter()) {
+            try ( PrintWriter out = response.getWriter()) {
                 out.write("{\"message\":\"Forbidden: your role is not allowed to access this resource\"}");
             }
             return;
@@ -66,6 +66,15 @@ public class GetAllEventsController extends HttpServlet {
                         e.getBannerUrl()
                 );
 
+                // ✅ Map thêm khu vực
+                dto.setAreaId(e.getAreaId());
+                dto.setAreaName(e.getAreaName());
+                dto.setFloor(e.getFloor());
+
+                // ✅ Map thêm địa điểm
+                dto.setVenueName(e.getVenueName());
+                dto.setVenueLocation(e.getVenueLocation());
+
                 if ("OPEN".equalsIgnoreCase(e.getStatus())) {
                     openEvents.add(dto);
                 } else if ("CLOSED".equalsIgnoreCase(e.getStatus())) {
@@ -79,14 +88,14 @@ public class GetAllEventsController extends HttpServlet {
             result.put("closedEvents", closedEvents);
 
             String json = gson.toJson(result);
-            try (PrintWriter out = response.getWriter()) {
+            try ( PrintWriter out = response.getWriter()) {
                 out.write(json);
             }
 
         } catch (SQLException ex) {
             ex.printStackTrace();
             response.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
-            try (PrintWriter out = response.getWriter()) {
+            try ( PrintWriter out = response.getWriter()) {
                 out.write("{\"message\":\"Internal server error when loading events\"}");
             }
         } catch (ClassNotFoundException ex) {

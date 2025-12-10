@@ -15,41 +15,34 @@ import java.util.List;
 public class EventDAO {
 
     // ================== GET ALL EVENTS (OPEN) ==================
-  public List<Event> getAllEvents() throws SQLException, ClassNotFoundException {
-    List<Event> list = new ArrayList<>();
+    // ================== GET ALL EVENTS (OPEN + CLOSED) ==================
+    public List<Event> getAllEvents() throws SQLException, ClassNotFoundException {
+        List<Event> list = new ArrayList<>();
 
-    String sql
-            = "SELECT event_id, title, description, start_time, end_time, "
-            + "       area_id, speaker_id, max_seats, status, created_by, created_at, "
-            + "       banner_url "
-            + "FROM [FPTEventManagement].[dbo].[Event] "
-            + "WHERE status IN ('OPEN', 'CLOSED')"; // ✅ lấy cả OPEN + CLOSED
+        String sql
+                = "SELECT e.event_id, e.title, e.description, e.start_time, e.end_time, "
+                + "       e.max_seats, e.status, e.created_by, e.created_at, e.banner_url, "
+                + "       e.area_id, "
+                + // ✅ lấy area_id từ Event
+                "       va.area_name, va.floor, "
+                + // ✅ thông tin khu vực
+                "       v.venue_id, v.venue_name, v.location "
+                + // ✅ thông tin venue
+                "FROM   [FPTEventManagement].[dbo].[Event] e "
+                + "LEFT JOIN [FPTEventManagement].[dbo].[Venue_Area] va ON e.area_id = va.area_id "
+                + "LEFT JOIN [FPTEventManagement].[dbo].[Venue]      v  ON va.venue_id = v.venue_id "
+                + "WHERE  e.status IN ('OPEN', 'CLOSED') "
+                + "ORDER BY e.start_time ASC";
 
-    try (Connection conn = DBUtils.getConnection();
-         PreparedStatement ps = conn.prepareStatement(sql);
-         ResultSet rs = ps.executeQuery()) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql);  ResultSet rs = ps.executeQuery()) {
 
-        while (rs.next()) {
-            Event e = new Event();
-            e.setEventId(rs.getInt("event_id"));
-            e.setTitle(rs.getString("title"));
-            e.setDescription(rs.getString("description"));
-            e.setStartTime(rs.getTimestamp("start_time"));
-            e.setEndTime(rs.getTimestamp("end_time"));
-            e.setAreaId((Integer) rs.getObject("area_id"));
-            e.setSpeakerId((Integer) rs.getObject("speaker_id"));
-            e.setMaxSeats(rs.getInt("max_seats"));
-            e.setStatus(rs.getString("status"));
-            e.setCreatedBy((Integer) rs.getObject("created_by"));
-            e.setCreatedAt(rs.getTimestamp("created_at"));
-            e.setBannerUrl(rs.getString("banner_url")); // ✅ map banner_url
-
-            list.add(e);
+            while (rs.next()) {
+                list.add(mapRowWithLocation(rs)); // ✅ map đầy đủ
+            }
         }
+        return list;
     }
 
-    return list;
-}
     // ================== EVENT DETAIL (JOIN Venue_Area + Venue) ==================
     public EventDetailDto getEventDetail(int eventId) throws SQLException, ClassNotFoundException {
         EventDetailDto detail = null;
@@ -211,4 +204,33 @@ public class EventDAO {
             ps.executeUpdate();
         }
     }
+
+    private Event mapRowWithLocation(ResultSet rs) throws SQLException {
+        Event e = new Event();
+
+        e.setEventId(rs.getInt("event_id"));
+        e.setTitle(rs.getString("title"));
+        e.setDescription(rs.getString("description"));
+        e.setStartTime(rs.getTimestamp("start_time"));
+        e.setEndTime(rs.getTimestamp("end_time"));
+
+        e.setMaxSeats(rs.getInt("max_seats"));
+        e.setStatus(rs.getString("status"));
+        e.setCreatedBy((Integer) rs.getObject("created_by"));
+        e.setCreatedAt(rs.getTimestamp("created_at"));
+        e.setBannerUrl(rs.getString("banner_url"));
+
+        // ===== Area =====
+        e.setAreaId((Integer) rs.getObject("area_id"));    // từ e.area_id
+        e.setAreaName(rs.getString("area_name"));
+        e.setFloor(rs.getString("floor"));
+
+        // ===== Venue =====
+        e.setVenueId((Integer) rs.getObject("venue_id"));
+        e.setVenueName(rs.getString("venue_name"));
+        e.setVenueLocation(rs.getString("location"));
+
+        return e;
+    }
+
 }

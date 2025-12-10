@@ -133,4 +133,28 @@ public class VenueDAO {
             return false;
         }
     }
+    
+     // Get single Venue by id
+    public Venue getVenueById(int venueId) {
+        String sql = "SELECT venue_id, venue_name, location, status FROM Venue WHERE venue_id = ?";
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, venueId);
+            try (ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    Venue v = new Venue();
+                    v.setVenueId(rs.getInt("venue_id"));
+                    v.setVenueName(rs.getString("venue_name"));
+                    v.setAddress(rs.getString("location"));
+                    v.setStatus(rs.getString("status"));
+                    // populate areas for completeness
+                    v.setAreas(getAreasForVenue(conn, venueId));
+                    return v;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ERROR] getVenueById: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
 }

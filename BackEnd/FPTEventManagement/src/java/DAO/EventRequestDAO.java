@@ -104,14 +104,32 @@ public class EventRequestDAO {
     public List<EventRequest> getPendingRequests() {
         List<EventRequest> list = new ArrayList<>();
 
-        String sql = "SELECT er.request_id, er.requester_id, u.full_name AS requester_name, "
-                + "er.title, er.description, er.preferred_start_time, er.preferred_end_time, "
-                + "er.expected_capacity, er.status, er.created_at, er.processed_by, "
-                + "er.processed_at, er.organizer_note, er.created_event_id "
-                + "FROM Event_Request er "
-                + "JOIN Users u ON er.requester_id = u.user_id "
-                + "WHERE er.status IN ('PENDING', 'APPROVED', 'REJECTED') " // ✅ lấy cả 3 trạng thái
-                + "ORDER BY er.created_at ASC";
+        String sql = "SELECT \n"
+                + "    er.request_id,\n"
+                + "    er.requester_id,\n"
+                + "    u.full_name AS requester_name,          -- tên người tạo request\n"
+                + "\n"
+                + "    er.title,\n"
+                + "    er.description,\n"
+                + "    er.preferred_start_time,\n"
+                + "    er.preferred_end_time,\n"
+                + "    er.expected_capacity,\n"
+                + "    er.status,\n"
+                + "    er.created_at,\n"
+                + "\n"
+                + "    er.processed_by,\n"
+                + "    pb.full_name AS processed_by_name,      -- ✅ tên người duyệt\n"
+                + "    er.processed_at,\n"
+                + "\n"
+                + "    er.organizer_note,\n"
+                + "    er.created_event_id\n"
+                + "FROM Event_Request er\n"
+                + "JOIN Users u \n"
+                + "    ON er.requester_id = u.user_id           -- người tạo request\n"
+                + "LEFT JOIN Users pb \n"
+                + "    ON er.processed_by = pb.user_id          -- ✅ người duyệt (có thể NULL)\n"
+                + "WHERE er.status IN ('PENDING', 'APPROVED', 'REJECTED')\n"
+                + "ORDER BY er.created_at ASC;";
 
         try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql);  ResultSet rs = ps.executeQuery()) {
 

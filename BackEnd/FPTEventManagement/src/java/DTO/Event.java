@@ -3,12 +3,62 @@ package DTO;
 import java.sql.Timestamp;
 
 public class Event {
+
     private int eventId;
     private String title;
     private String description;
     private Timestamp startTime;
     private Timestamp endTime;
     private String bannerUrl;
+
+    // Area
+    private String areaName;
+    private String floor;
+
+// Venue
+    private Integer venueId;
+    private String venueName;
+    private String venueLocation;
+
+    public String getAreaName() {
+        return areaName;
+    }
+
+    public void setAreaName(String areaName) {
+        this.areaName = areaName;
+    }
+
+    public String getFloor() {
+        return floor;
+    }
+
+    public void setFloor(String floor) {
+        this.floor = floor;
+    }
+
+    public Integer getVenueId() {
+        return venueId;
+    }
+
+    public void setVenueId(Integer venueId) {
+        this.venueId = venueId;
+    }
+
+    public String getVenueName() {
+        return venueName;
+    }
+
+    public void setVenueName(String venueName) {
+        this.venueName = venueName;
+    }
+
+    public String getVenueLocation() {
+        return venueLocation;
+    }
+
+    public void setVenueLocation(String venueLocation) {
+        this.venueLocation = venueLocation;
+    }
 
     public String getBannerUrl() {
         return bannerUrl;
@@ -27,7 +77,8 @@ public class Event {
     private Integer createdBy;
     private Timestamp createdAt;
 
-    public Event() {}
+    public Event() {
+    }
 
     public int getEventId() {
         return eventId;
@@ -116,6 +167,5 @@ public class Event {
     public void setCreatedAt(Timestamp createdAt) {
         this.createdAt = createdAt;
     }
-
 
 }

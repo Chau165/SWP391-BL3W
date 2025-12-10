@@ -4,7 +4,8 @@ import java.sql.Timestamp;
 
 /**
  * Dto dùng cho danh sách event FE hiển thị.
- * CỐ Ý không có: createdBy, createdAt, venueId, speakerId
+ * CỐ Ý không có: createdBy, createdAt, speakerId
+ * ĐÃ THÊM: thông tin khu vực & địa điểm (areaName, floor, venueName, venueLocation)
  */
 public class EventListDto {
     private int eventId;
@@ -15,6 +16,15 @@ public class EventListDto {
     private int maxSeats;
     private String status;
     private String bannerUrl;
+
+    // ===== Thông tin khu vực =====
+    private Integer areaId;
+    private String areaName;
+    private String floor;
+
+    // ===== Thông tin địa điểm =====
+    private String venueName;
+    private String venueLocation;
 
     public EventListDto() {}
 
@@ -93,5 +103,47 @@ public class EventListDto {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    // ===== Getter / Setter khu vực =====
+    public Integer getAreaId() {
+        return areaId;
+    }
+
+    public void setAreaId(Integer areaId) {
+        this.areaId = areaId;
+    }
+
+    public String getAreaName() {
+        return areaName;
+    }
+
+    public void setAreaName(String areaName) {
+        this.areaName = areaName;
+    }
+
+    public String getFloor() {
+        return floor;
+    }
+
+    public void setFloor(String floor) {
+        this.floor = floor;
+    }
+
+    // ===== Getter / Setter địa điểm =====
+    public String getVenueName() {
+        return venueName;
+    }
+
+    public void setVenueName(String venueName) {
+        this.venueName = venueName;
+    }
+
+    public String getVenueLocation() {
+        return venueLocation;
+    }
+
+    public void setVenueLocation(String venueLocation) {
+        this.venueLocation = venueLocation;
     }
 }

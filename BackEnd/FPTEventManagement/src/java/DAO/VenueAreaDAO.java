@@ -190,4 +190,28 @@ public class VenueAreaDAO {
             return false;
         }
     }
+    
+        // Get single VenueArea by area_id
+    public VenueArea getVenueAreaById(int areaId) {
+        String sql = "SELECT area_id, venue_id, area_name, floor, capacity, status FROM Venue_Area WHERE area_id = ?";
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, areaId);
+            try ( ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    VenueArea va  = new VenueArea();
+                    va.setAreaId(rs.getInt("area_id"));
+                    va.setVenueId(rs.getInt("venue_id"));
+                    va.setAreaName(rs.getNString("area_name"));
+                    va.setFloor(rs.getNString("floor"));
+                    va.setCapacity(rs.getInt("capacity"));
+                    va.setStatus(rs.getNString("status"));
+                    return va;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ERROR] getVenueAreaById: " + e.getMessage());
+            e.printStackTrace();
+        }
+        return null;
+    }
 }
