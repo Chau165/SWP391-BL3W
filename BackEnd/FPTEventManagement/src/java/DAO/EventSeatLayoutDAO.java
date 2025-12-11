@@ -27,7 +27,7 @@ public class EventSeatLayoutDAO {
     // ============= XOÁ LAYOUT CŨ CỦA EVENT ============
     public void deleteByEventId(Connection conn, int eventId) throws SQLException {
         String sql = "DELETE FROM Event_Seat_Layout WHERE event_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, eventId);
             ps.executeUpdate();
         }
@@ -47,14 +47,14 @@ public class EventSeatLayoutDAO {
         // 1. Lấy danh sách ghế vật lý trong area (chỉ lấy ghế ACTIVE)
         List<Integer> seatIds = new ArrayList<>();
 
-        String selectSql = "SELECT seat_id " +
-                           "FROM Seat " +
-                           "WHERE area_id = ? AND status = 'ACTIVE' " +
-                           "ORDER BY row_no, col_no, seat_code";
+        String selectSql = "SELECT seat_id "
+                + "FROM Seat "
+                + "WHERE area_id = ? AND status = 'ACTIVE' "
+                + "ORDER BY row_no, col_no, seat_code";
 
-        try (PreparedStatement ps = conn.prepareStatement(selectSql)) {
+        try ( PreparedStatement ps = conn.prepareStatement(selectSql)) {
             ps.setInt(1, areaId);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     seatIds.add(rs.getInt("seat_id"));
                 }
@@ -63,9 +63,9 @@ public class EventSeatLayoutDAO {
 
         if (seatIds.size() < totalNeeded) {
             throw new RuntimeException(
-                    "Not enough physical seats in area_id=" + areaId +
-                    " | active seats in DB=" + seatIds.size() +
-                    " < required=" + totalNeeded
+                    "Not enough physical seats in area_id=" + areaId
+                    + " | active seats in DB=" + seatIds.size()
+                    + " < required=" + totalNeeded
             );
         }
 
@@ -73,10 +73,10 @@ public class EventSeatLayoutDAO {
         deleteByEventId(conn, eventId);
 
         // 3. Insert layout mới
-        String insertSql = "INSERT INTO Event_Seat_Layout (event_id, seat_id, seat_type, status) " +
-                           "VALUES (?, ?, ?, ?)";
+        String insertSql = "INSERT INTO Event_Seat_Layout (event_id, seat_id, seat_type, status) "
+                + "VALUES (?, ?, ?, ?)";
 
-        try (PreparedStatement psInsert = conn.prepareStatement(insertSql)) {
+        try ( PreparedStatement psInsert = conn.prepareStatement(insertSql)) {
 
             int index = 0;
 
@@ -108,26 +108,35 @@ public class EventSeatLayoutDAO {
         List<Seat> list = new ArrayList<>();
 
         StringBuilder sql = new StringBuilder(
-                "SELECT " +
-                "   s.seat_id, " +
-                "   s.area_id, " +
-                "   s.seat_code, " +
-                "   s.row_no, " +
-                "   s.col_no, " +
-                "   esl.seat_type, " +
-                "   CASE " +
-                "       WHEN EXISTS ( " +
-                "           SELECT 1 FROM Ticket t " +
-                "           WHERE t.event_id = esl.event_id " +
-                "             AND t.seat_id = esl.seat_id " +
-                "             AND t.status IN ('BOOKED','CHECKED_IN') " +
-                "       ) THEN 'BOOKED' " +
-                "       ELSE 'AVAILABLE' " +
-                "   END AS layout_status " +
-                "FROM Event_Seat_Layout esl " +
-                "JOIN Seat s ON esl.seat_id = s.seat_id " +
-                "WHERE esl.event_id = ? " +
-                "  AND s.status = 'ACTIVE' "
+                "SELECT "
+                + "   s.seat_id, "
+                + "   s.area_id, "
+                + "   s.seat_code, "
+                + "   s.row_no, "
+                + "   s.col_no, "
+                + "   esl.seat_type, "
+                + "   CASE "
+                + "       WHEN EXISTS ( "
+                + "           SELECT 1 FROM Ticket t "
+                + "           WHERE t.event_id = esl.event_id "
+                + "             AND t.seat_id = esl.seat_id "
+                + "             AND t.status IN ('BOOKED','CHECKED_IN') "
+                + "       ) THEN 'BOOKED' "
+                + // ✅ đã mua / checkin
+                "       WHEN EXISTS ( "
+                + "           SELECT 1 FROM Ticket t "
+                + "           WHERE t.event_id = esl.event_id "
+                + "             AND t.seat_id = esl.seat_id "
+                + "             AND t.status = 'PENDING' "
+                + "       ) THEN 'HOLD' "
+                + // ✅ đang giữ tạm (thanh toán VNPay)
+                "       ELSE 'AVAILABLE' "
+                + // ✅ còn trống
+                "   END AS layout_status "
+                + "FROM Event_Seat_Layout esl "
+                + "JOIN Seat s ON esl.seat_id = s.seat_id "
+                + "WHERE esl.event_id = ? "
+                + "  AND s.status = 'ACTIVE' "
         );
 
         boolean filterByType = (seatTypeFilter != null && !seatTypeFilter.trim().isEmpty());
@@ -137,15 +146,14 @@ public class EventSeatLayoutDAO {
 
         sql.append(" ORDER BY s.row_no, s.col_no, s.seat_code ");
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql.toString())) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql.toString())) {
 
             ps.setInt(1, eventId);
             if (filterByType) {
                 ps.setString(2, seatTypeFilter.trim());
             }
 
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     list.add(mapRowToSeatForEvent(rs));
                 }
@@ -161,36 +169,35 @@ public class EventSeatLayoutDAO {
 
     // ============= LẤY 1 GHẾ CỤ THỂ TRONG EVENT (DÙNG CHO PAYMENT) ============
     public Seat getSeatForEvent(int eventId, int seatId) {
-        String sql =
-                "SELECT " +
-                "   s.seat_id, " +
-                "   s.area_id, " +
-                "   s.seat_code, " +
-                "   s.row_no, " +
-                "   s.col_no, " +
-                "   esl.seat_type, " +
-                "   CASE " +
-                "       WHEN EXISTS ( " +
-                "           SELECT 1 FROM Ticket t " +
-                "           WHERE t.event_id = esl.event_id " +
-                "             AND t.seat_id = esl.seat_id " +
-                "             AND t.status IN ('BOOKED','CHECKED_IN') " +
-                "       ) THEN 'BOOKED' " +
-                "       ELSE 'AVAILABLE' " +
-                "   END AS layout_status " +
-                "FROM Event_Seat_Layout esl " +
-                "JOIN Seat s ON esl.seat_id = s.seat_id " +
-                "WHERE esl.event_id = ? " +
-                "  AND esl.seat_id = ? " +
-                "  AND s.status = 'ACTIVE'";
+        String sql
+                = "SELECT "
+                + "   s.seat_id, "
+                + "   s.area_id, "
+                + "   s.seat_code, "
+                + "   s.row_no, "
+                + "   s.col_no, "
+                + "   esl.seat_type, "
+                + "   CASE "
+                + "       WHEN EXISTS ( "
+                + "           SELECT 1 FROM Ticket t "
+                + "           WHERE t.event_id = esl.event_id "
+                + "             AND t.seat_id = esl.seat_id "
+                + "             AND t.status IN ('BOOKED','CHECKED_IN') "
+                + "       ) THEN 'BOOKED' "
+                + "       ELSE 'AVAILABLE' "
+                + "   END AS layout_status "
+                + "FROM Event_Seat_Layout esl "
+                + "JOIN Seat s ON esl.seat_id = s.seat_id "
+                + "WHERE esl.event_id = ? "
+                + "  AND esl.seat_id = ? "
+                + "  AND s.status = 'ACTIVE'";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, eventId);
             ps.setInt(2, seatId);
 
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return mapRowToSeatForEvent(rs);
                 }

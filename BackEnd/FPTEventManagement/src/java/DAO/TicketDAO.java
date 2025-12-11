@@ -5,12 +5,14 @@ import DTO.Ticket;
 import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.sql.SQLIntegrityConstraintViolationException;
 import java.sql.Statement;
 import java.sql.Timestamp;
 import java.sql.Types;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 import mylib.DBUtils;
 
 public class TicketDAO {
@@ -191,17 +193,17 @@ public class TicketDAO {
         }
         return null;
     }
-    
+
     /**
      * Get ticket id by event + user + category. Return 0 if not found.
      */
     public int getTicketId(int eventId, int userId, int categoryId) {
         String sql = "SELECT ticket_id FROM Ticket WHERE event_id = ? AND user_id = ? AND category_ticket_id = ?";
-        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, eventId);
             ps.setInt(2, userId);
             ps.setInt(3, categoryId);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt("ticket_id");
                 }
@@ -232,8 +234,8 @@ public class TicketDAO {
             return false;
         }
     }
-    
-        // New: Lấy danh sách vé (kèm thông tin Event + Venue) theo user_id
+
+    // New: Lấy danh sách vé (kèm thông tin Event + Venue) theo user_id
     public List<MyTicketResponse> getTicketsByUserId(int userId) {
         String sql = "SELECT t.ticket_id, t.qr_code_value, t.status, t.checkin_time, "
                 + " e.title AS event_name, e.start_time AS start_time, v.venue_name AS venue_name "
@@ -246,10 +248,10 @@ public class TicketDAO {
 
         List<MyTicketResponse> result = new ArrayList<>();
 
-        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, userId);
 
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     MyTicketResponse m = new MyTicketResponse();
                     m.setTicketId(rs.getInt("ticket_id"));
@@ -270,19 +272,18 @@ public class TicketDAO {
 
         return result;
     }
-    
-     // New: get event statistics (total tickets, checked-in count, check-in rate)
+
+    // New: get event statistics (total tickets, checked-in count, check-in rate)
     public DTO.EventStatsDTO getEventStats(int eventId) {
         String sql = "SELECT COUNT(*) AS total, "
                 + "SUM(CASE WHEN status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS checked_in "
                 + "FROM Ticket WHERE event_id = ? AND status != 'CANCELLED'";
 
-        try (java.sql.Connection conn = DBUtils.getConnection();
-             java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( java.sql.Connection conn = DBUtils.getConnection();  java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, eventId);
 
-            try (java.sql.ResultSet rs = ps.executeQuery()) {
+            try ( java.sql.ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     int total = rs.getInt("total");
                     int checkedIn = rs.getInt("checked_in");
@@ -310,6 +311,88 @@ public class TicketDAO {
         }
         return null;
     }
+
+    public List<Ticket> findTicketsByIds(List<Integer> ids) throws SQLException, ClassNotFoundException {
+        List<Ticket> list = new ArrayList<>();
+
+        if (ids == null || ids.isEmpty()) {
+            return list;
+        }
+
+        String placeholders = ids.stream().map(id -> "?").collect(Collectors.joining(","));
+        String sql = "SELECT ticket_id, event_id, user_id, category_ticket_id, bill_id, seat_id, "
+                + "qr_code_value, qr_issued_at, status, checkin_time "
+                + "FROM Ticket WHERE ticket_id IN (" + placeholders + ")";
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            int idx = 1;
+            for (Integer id : ids) {
+                ps.setInt(idx++, id);
+            }
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Ticket t = new Ticket();
+                    t.setTicketId(rs.getInt("ticket_id"));
+                    t.setEventId(rs.getInt("event_id"));
+                    t.setUserId(rs.getInt("user_id"));
+                    t.setCategoryTicketId(rs.getInt("category_ticket_id"));
+                    t.setBillId((Integer) rs.getObject("bill_id"));
+                    t.setSeatId(rs.getInt("seat_id"));
+                    t.setQrCodeValue(rs.getString("qr_code_value"));
+                    t.setQrIssuedAt(rs.getTimestamp("qr_issued_at"));
+                    t.setStatus(rs.getString("status"));
+                    t.setCheckinTime(rs.getTimestamp("checkin_time"));
+
+                    list.add(t);
+                }
+            }
+        }
+
+        return list;
+    }
+
+    public void updateTicketAfterPayment(Ticket t) throws SQLException, ClassNotFoundException {
+        String sql = "UPDATE Ticket SET "
+                + "bill_id = ?, "
+                + "status = ?, "
+                + "qr_issued_at = ? "
+                + "WHERE ticket_id = ?";
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            if (t.getBillId() == null) {
+                ps.setNull(1, java.sql.Types.INTEGER);
+            } else {
+                ps.setInt(1, t.getBillId());
+            }
+
+            ps.setString(2, t.getStatus());
+            ps.setTimestamp(3, t.getQrIssuedAt());
+            ps.setInt(4, t.getTicketId());
+
+            ps.executeUpdate();
+        }
+    }
+
+    public void deleteTicketsByIds(List<Integer> ids) throws SQLException, ClassNotFoundException {
+        if (ids == null || ids.isEmpty()) {
+            return;
+        }
+
+        String placeholders = ids.stream().map(id -> "?").collect(Collectors.joining(","));
+        String sql = "DELETE FROM Ticket WHERE ticket_id IN (" + placeholders + ")";
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            int idx = 1;
+            for (Integer id : ids) {
+                ps.setInt(idx++, id);
+            }
+
+            ps.executeUpdate();
+        }
+    }
+
 }
-
-

@@ -6,22 +6,30 @@ import config.VnPayUtil;
 
 import DAO.CategoryTicketDAO;
 import DAO.EventDAO;
-import DAO.EventSeatLayoutDAO;   // ✅ dùng layout theo event
-import DAO.SeatDAO;             // optional, chỉ để double-check Ticket
+import DAO.EventSeatLayoutDAO;   // dùng layout theo event
+import DAO.SeatDAO;             // dùng thêm hàm findAlreadyBookedSeatIdsForEvent
+import DAO.TicketDAO;           // ✅ thêm
 import DTO.CategoryTicket;
 import DTO.Event;
 import DTO.Seat;
+import DTO.Ticket;              // ✅ thêm
 
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.stream.Collectors;   // ✅ thêm
 
 @WebServlet("/api/payment-ticket")
 public class PaymentTicketController extends HttpServlet {
 
     private final EventSeatLayoutDAO eventSeatLayoutDAO = new EventSeatLayoutDAO();
-    private final SeatDAO seatDAO = new SeatDAO(); // chỉ dùng hàm isSeatAlreadyBookedForEvent (nếu muốn)
+    private final SeatDAO seatDAO = new SeatDAO();
+    private final TicketDAO ticketDAO = new TicketDAO(); // ✅ dùng tạo ticket PENDING
 
     @Override
     protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -36,17 +44,18 @@ public class PaymentTicketController extends HttpServlet {
             String userIdStr     = req.getParameter("userId");
             String eventIdStr    = req.getParameter("eventId");
             String categoryIdStr = req.getParameter("categoryTicketId");
-            String seatIdStr     = req.getParameter("seatId");
+            // ⚠️ nhiều ghế, dạng "1,2,3"
+            String seatIdsStr    = req.getParameter("seatIds");
 
             System.out.println("Raw params -> userId=" + userIdStr
                     + ", eventId=" + eventIdStr
                     + ", categoryTicketId=" + categoryIdStr
-                    + ", seatId=" + seatIdStr);
+                    + ", seatIds=" + seatIdsStr);
 
-            if (userIdStr == null || eventIdStr == null
-                    || categoryIdStr == null || seatIdStr == null) {
+            if (isBlank(userIdStr) || isBlank(eventIdStr)
+                    || isBlank(categoryIdStr) || isBlank(seatIdsStr)) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().println("Missing userId/eventId/categoryTicketId/seatId");
+                resp.getWriter().println("Missing userId/eventId/categoryTicketId/seatIds");
                 System.out.println("❌ Missing required params");
                 return;
             }
@@ -54,12 +63,27 @@ public class PaymentTicketController extends HttpServlet {
             int userId     = Integer.parseInt(userIdStr);
             int eventId    = Integer.parseInt(eventIdStr);
             int categoryId = Integer.parseInt(categoryIdStr);
-            int seatId     = Integer.parseInt(seatIdStr);
+
+            // Parse danh sách seatId
+            String[] tokens = seatIdsStr.split(",");
+            List<Integer> seatIds = new ArrayList<>();
+            for (String t : tokens) {
+                if (t != null && !t.trim().isEmpty()) {
+                    seatIds.add(Integer.parseInt(t.trim()));
+                }
+            }
+
+            if (seatIds.isEmpty()) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                resp.getWriter().println("seatIds is empty");
+                System.out.println("❌ seatIds is empty");
+                return;
+            }
 
             System.out.println("Parsed params -> userId=" + userId
                     + ", eventId=" + eventId
                     + ", categoryId=" + categoryId
-                    + ", seatId=" + seatId);
+                    + ", seatIds=" + seatIds);
 
             // ================== Validate Event ==================
             EventDAO eventDAO = new EventDAO();
@@ -85,59 +109,121 @@ public class PaymentTicketController extends HttpServlet {
                 return;
             }
 
-            // ================== Validate Seat (theo layout event) ==================
-            // ❗❗ LẤY GHẾ TỪ Event_Seat_Layout + Seat
-            Seat seat = eventSeatLayoutDAO.getSeatForEvent(eventId, seatId);
-            System.out.println("[CHECK] Seat for event: " + seat);
+            String ticketName = ct.getName();  // "VIP", "STANDARD", ...
 
-            if (seat == null) {
-                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().println("Seat not configured for this event");
-                System.out.println("❌ Seat not configured for this event");
+            // ================== Validate từng ghế theo layout event ==================
+            for (Integer seatId : seatIds) {
+                // LẤY GHẾ TỪ Event_Seat_Layout + Seat
+                Seat seat = eventSeatLayoutDAO.getSeatForEvent(eventId, seatId);
+                System.out.println("[CHECK] Seat for event: " + seat);
+
+                if (seat == null) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.getWriter().println("Seat " + seatId + " not configured for this event");
+                    System.out.println("❌ Seat " + seatId + " not configured for this event");
+                    return;
+                }
+
+                // optional: check ghế có thuộc area của event không
+                if (event.getAreaId() != null && seat.getAreaId() != event.getAreaId()) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.getWriter().println("Seat " + seatId + " does not belong to event area");
+                    System.out.println("❌ Seat " + seatId + " does not belong to event area");
+                    return;
+                }
+
+                // status ở đây là layout_status: AVAILABLE / BOOKED (nếu bạn có cột này)
+                if (!"AVAILABLE".equalsIgnoreCase(seat.getStatus())) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.getWriter().println("Seat " + seatId + " is not AVAILABLE for this event");
+                    System.out.println("❌ Seat " + seatId + " is not AVAILABLE, status=" + seat.getStatus());
+                    return;
+                }
+
+                // So sánh loại ghế: seat_type (VIP/STANDARD) vs CategoryTicket.name
+                String seatType = seat.getSeatType(); // lấy từ Event_Seat_Layout
+                if (seatType == null || ticketName == null
+                        || !seatType.equalsIgnoreCase(ticketName.trim())) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    resp.getWriter().println("Seat " + seatId + " type does not match ticket type");
+                    System.out.println("❌ Seat type mismatch. seatId=" + seatId
+                            + ", seatType=" + seatType + ", ticketName=" + ticketName);
+                    return;
+                }
+            }
+
+            // ================== Double-check trên Ticket table (đã có ai giữ/chốt chưa) ==================
+            try {
+                List<Integer> alreadyBookedSeatIds = seatDAO.findAlreadyBookedSeatIdsForEvent(eventId, seatIds);
+                if (!alreadyBookedSeatIds.isEmpty()) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    String msg = "Some seats already reserved/booked: " + alreadyBookedSeatIds;
+                    resp.getWriter().println(msg);
+                    System.out.println("❌ " + msg);
+                    return;
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+                resp.getWriter().println("Error checking booked seats: " + ex.toString());
+                System.out.println("❌ Error checking booked seats: " + ex.toString());
                 return;
             }
 
-            // optional: check ghế có thuộc area của event không
-            if (event.getAreaId() != null && seat.getAreaId() != event.getAreaId()) {
-                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().println("Seat does not belong to event area");
-                System.out.println("❌ Seat does not belong to event area");
+            // ================== TẠO TICKET GIẢ (PENDING) ĐỂ GIỮ CHỖ ==================
+            List<Integer> tempTicketIds = new ArrayList<>();
+            Timestamp now = new Timestamp(System.currentTimeMillis());
+
+            try {
+                for (Integer seatId : seatIds) {
+                    Ticket temp = new Ticket();
+                    temp.setEventId(eventId);
+                    temp.setUserId(userId);
+                    temp.setCategoryTicketId(categoryId);
+                    temp.setSeatId(seatId);
+                    temp.setBillId(null);          // chưa có bill
+                    temp.setStatus("PENDING");     // ⚠️ nhớ cho phép trong CHECK constraint
+                    temp.setQrIssuedAt(null);
+                    temp.setQrCodeValue(null);
+
+                    int tid = ticketDAO.insertTicketAndReturnId(temp);
+                    if (tid <= 0) {
+                        throw new SQLException("insertTicketAndReturnId trả về <= 0 cho seatId=" + seatId);
+                    }
+                    tempTicketIds.add(tid);
+                }
+            } catch (Exception ex) {
+                ex.printStackTrace();
+                // nếu lỗi unique (ghế vừa bị người khác giữ/trước đó), xoá hết ticket vừa tạo
+                if (!tempTicketIds.isEmpty()) {
+                    try {
+                        ticketDAO.deleteTicketsByIds(tempTicketIds);
+                    } catch (Exception ex2) {
+                        ex2.printStackTrace();
+                    }
+                }
+
+                resp.setStatus(HttpServletResponse.SC_CONFLICT);
+                resp.getWriter().println("Seat(s) already taken by another user. Please choose other seats.");
+                System.out.println("❌ Error creating PENDING tickets: " + ex.toString());
                 return;
             }
 
-            // status ở đây là layout_status: AVAILABLE / BOOKED
-            if (!"AVAILABLE".equalsIgnoreCase(seat.getStatus())) {
-                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().println("Seat is not AVAILABLE for this event");
-                System.out.println("❌ Seat is not AVAILABLE for this event, status=" + seat.getStatus());
-                return;
-            }
+            String tempTicketIdsStr = tempTicketIds.stream()
+                    .map(String::valueOf)
+                    .collect(Collectors.joining(","));
 
-            // So sánh loại ghế: seat_type (VIP/STANDARD) vs CategoryTicket.name (ví dụ "VIP", "STANDARD")
-            String seatType = seat.getSeatType();      // lấy từ Event_Seat_Layout
-            String ticketName = ct.getName();          // "VIP", "Standard", "Vé VIP",...
+            System.out.println("✅ Created PENDING tickets: " + tempTicketIdsStr);
 
-            if (seatType == null || ticketName == null
-                    || !seatType.equalsIgnoreCase(ticketName.trim())) {
-                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().println("Seat type does not match ticket type");
-                System.out.println("❌ Seat type mismatch. seatType=" + seatType + ", ticketName=" + ticketName);
-                return;
-            }
+            // ================== Tính tiền (theo số ghế) ==================
+            BigDecimal unitPrice = ct.getPrice();                       // giá 1 vé
+            BigDecimal totalPrice = unitPrice.multiply(
+                    BigDecimal.valueOf(seatIds.size()));               // tổng
+            long amountVND = totalPrice.longValue();                    // cho VNPay
 
-            // (optional) double-check bằng Ticket table
-            if (seatDAO.isSeatAlreadyBookedForEvent(eventId, seatId)) {
-                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                resp.getWriter().println("Seat already booked");
-                System.out.println("❌ Seat already booked (check from Ticket table)");
-                return;
-            }
-
-            // ================== Tính tiền ==================
-            BigDecimal price = ct.getPrice();    // ví dụ 150000.00
-            long amountVND   = price.longValue(); // 150000
-
-            System.out.println("[PRICE] Ticket price(BigDecimal) = " + price
+            System.out.println("[PRICE] unitPrice = " + unitPrice
+                    + ", quantity = " + seatIds.size()
+                    + " -> totalPrice = " + totalPrice
                     + " -> amountVND (long) = " + amountVND);
 
             // ================== Build orderInfo (gửi sang VNPay) ==================
@@ -145,7 +231,8 @@ public class PaymentTicketController extends HttpServlet {
                     "userId=" + userId +
                     "&eventId=" + eventId +
                     "&categoryTicketId=" + categoryId +
-                    "&seatId=" + seatId +
+                    "&seatIds=" + seatIdsStr +
+                    "&tempTicketIds=" + tempTicketIdsStr +   // ✅ quan trọng
                     "&orderType=buyTicket";
 
             System.out.println("[ORDER_INFO] " + orderInfo);
@@ -171,9 +258,13 @@ public class PaymentTicketController extends HttpServlet {
 
         } catch (Exception e) {
             e.printStackTrace();
-            // in cả toString cho dễ debug loại Exception
             resp.getWriter().println("Lỗi thanh toán vé: " + e.toString());
             System.out.println("❌ Exception in PaymentTicketController: " + e.toString());
         }
+    }
+
+    // helper thay cho String.isBlank() (Java 8)
+    private boolean isBlank(String s) {
+        return s == null || s.trim().isEmpty();
     }
 }

@@ -67,9 +67,9 @@ public class EventStatsController extends HttpServlet {
         }
 
         String role = JwtUtils.getRoleFromToken(token);
-        if (role == null || !(role.equalsIgnoreCase("ORGANIZER") || role.equalsIgnoreCase("ADMIN"))) {
+        if (role == null || !(role.equalsIgnoreCase("ORGANIZER") || role.equalsIgnoreCase("STAFF"))) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            resp.getWriter().write("{\"error\":\"Permission denied. ORGANIZER or ADMIN only.\"}");
+            resp.getWriter().write("{\"error\":\"Permission denied. ORGANIZER or STAFF only.\"}");
             return;
         }
 

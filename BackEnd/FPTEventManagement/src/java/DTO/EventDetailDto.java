@@ -33,6 +33,25 @@ public class EventDetailDto {
     // Speaker
     private String speakerName;    // từ Speaker
 
+    private String speakerBio;
+    private String speakerAvatarUrl;
+
+    public String getSpeakerBio() {
+        return speakerBio;
+    }
+
+    public void setSpeakerBio(String speakerBio) {
+        this.speakerBio = speakerBio;
+    }
+
+    public String getSpeakerAvatarUrl() {
+        return speakerAvatarUrl;
+    }
+
+    public void setSpeakerAvatarUrl(String speakerAvatarUrl) {
+        this.speakerAvatarUrl = speakerAvatarUrl;
+    }
+
     // Danh sách loại vé
     private List<CategoryTicket> tickets;
 

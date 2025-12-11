@@ -166,4 +166,41 @@ public class SeatDAO {
             ps.executeBatch();
         }
     }
+    
+      public List<Integer> findAlreadyBookedSeatIdsForEvent(int eventId, List<Integer> seatIds) throws SQLException, ClassNotFoundException {
+        List<Integer> result = new ArrayList<>();
+
+        if (seatIds == null || seatIds.isEmpty()) {
+            return result;
+        }
+
+        StringBuilder sql = new StringBuilder(
+            "SELECT seat_id FROM Ticket WHERE event_id = ? AND seat_id IN ("
+        );
+
+        for (int i = 0; i < seatIds.size(); i++) {
+            if (i > 0) sql.append(",");
+            sql.append("?");
+        }
+        sql.append(")");
+
+        try (Connection con = DBUtils.getConnection();
+             PreparedStatement ps = con.prepareStatement(sql.toString())) {
+
+            int idx = 1;
+            ps.setInt(idx++, eventId);
+            for (Integer seatId : seatIds) {
+                ps.setInt(idx++, seatId);
+            }
+
+            try (ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    result.add(rs.getInt("seat_id"));
+                }
+            }
+        }
+
+        return result;
+    }
 }
+

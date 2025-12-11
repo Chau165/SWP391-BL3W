@@ -49,10 +49,12 @@ public class EventDAO {
 
         String sqlEvent
                 = "SELECT e.event_id, e.title, e.description, e.start_time, e.end_time, "
-                + "       e.max_seats, e.status, e.banner_url, " // ✅ thêm e.banner_url
+                + "       e.max_seats, e.status, e.banner_url, "
                 + "       v.venue_name, "
                 + "       va.area_id, va.area_name, va.floor, va.capacity, "
-                + "       s.full_name AS speaker_name "
+                + "       s.full_name   AS speaker_name, "
+                + "       s.bio         AS speaker_bio, " // ✅ thêm
+                + "       s.avatar_url  AS speaker_avatar_url " // ✅ thêm
                 + "FROM   [FPTEventManagement].[dbo].[Event]       e "
                 + "JOIN   [FPTEventManagement].[dbo].[Venue_Area]  va ON e.area_id   = va.area_id "
                 + "JOIN   [FPTEventManagement].[dbo].[Venue]       v  ON va.venue_id = v.venue_id "
@@ -95,38 +97,38 @@ public class EventDAO {
 
                         // Speaker
                         detail.setSpeakerName(rs.getString("speaker_name"));
+                        detail.setSpeakerBio(rs.getString("speaker_bio"));                 // ✅ mới
+                        detail.setSpeakerAvatarUrl(rs.getString("speaker_avatar_url"));    // ✅ mới
                     } else {
-                        // Không tìm thấy event
                         return null;
                     }
                 }
-            }
 
-            // 2) Lấy danh sách loại vé
-            List<CategoryTicket> tickets = new ArrayList<>();
-            try ( PreparedStatement ps2 = conn.prepareStatement(sqlTickets)) {
-                ps2.setInt(1, eventId);
-                try ( ResultSet rs2 = ps2.executeQuery()) {
-                    while (rs2.next()) {
-                        CategoryTicket t = new CategoryTicket();
-                        t.setCategoryTicketId(rs2.getInt("category_ticket_id"));
-                        t.setEventId(eventId);
-                        t.setName(rs2.getString("name"));
-                        t.setPrice(rs2.getBigDecimal("price"));
-                        t.setMaxQuantity(rs2.getInt("max_quantity"));
-                        t.setStatus(rs2.getString("status"));
-                        tickets.add(t);
+                // 2) Lấy danh sách loại vé
+                List<CategoryTicket> tickets = new ArrayList<>();
+                try ( PreparedStatement ps2 = conn.prepareStatement(sqlTickets)) {
+                    ps2.setInt(1, eventId);
+                    try ( ResultSet rs2 = ps2.executeQuery()) {
+                        while (rs2.next()) {
+                            CategoryTicket t = new CategoryTicket();
+                            t.setCategoryTicketId(rs2.getInt("category_ticket_id"));
+                            t.setEventId(eventId);
+                            t.setName(rs2.getString("name"));
+                            t.setPrice(rs2.getBigDecimal("price"));
+                            t.setMaxQuantity(rs2.getInt("max_quantity"));
+                            t.setStatus(rs2.getString("status"));
+                            tickets.add(t);
+                        }
                     }
                 }
+
+                detail.setTickets(tickets);
             }
 
-            detail.setTickets(tickets);
+            return detail;
         }
-
-        return detail;
     }
-
-    // ================== GET EVENT BY ID ==================
+        // ================== GET EVENT BY ID ==================
     public Event getEventById(int eventId) {
         String sql
                 = "SELECT event_id, title, description, start_time, end_time, "

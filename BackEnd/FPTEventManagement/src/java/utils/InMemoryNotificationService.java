@@ -45,4 +45,21 @@ public class InMemoryNotificationService {
             }
         }
     }
+
+    /**
+     * Đánh dấu 1 notification là read
+     * @return true nếu tìm thấy & set read, false nếu không tìm thấy
+     */
+    public static boolean markOneRead(int userId, int notiId) {
+        List<NotiItem> list = USER_NOTIS.get(userId);
+        if (list == null) return false;
+
+        for (NotiItem n : list) {
+            if (n.id == notiId) {
+                n.read = true;
+                return true;
+            }
+        }
+        return false;
+    }
 }

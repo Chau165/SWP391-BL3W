@@ -1115,7 +1115,10 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "\"floor\":{\"type\":\"string\",\"nullable\":true},"
                 + "\"venueId\":{\"type\":\"integer\",\"nullable\":true},"
                 + "\"venueName\":{\"type\":\"string\",\"nullable\":true},"
-                + "\"venueLocation\":{\"type\":\"string\",\"nullable\":true}"
+                + "\"venueLocation\":{\"type\":\"string\",\"nullable\":true},"
+                + "\"speakerName\":{\"type\":\"string\",\"nullable\":true},"
+                + "\"speakerBio\":{\"type\":\"string\",\"nullable\":true},"
+                + "\"speakerAvatarUrl\":{\"type\":\"string\",\"nullable\":true}"
                 + "}"
                 + "},"
                 // EventsGroupedResponse - dùng cho /api/events
