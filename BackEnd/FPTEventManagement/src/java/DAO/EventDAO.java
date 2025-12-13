@@ -53,17 +53,18 @@ public class EventDAO {
                 + "       v.venue_name, "
                 + "       va.area_id, va.area_name, va.floor, va.capacity, "
                 + "       s.full_name   AS speaker_name, "
-                + "       s.bio         AS speaker_bio, " // ✅ thêm
-                + "       s.avatar_url  AS speaker_avatar_url " // ✅ thêm
+                + "       s.bio         AS speaker_bio, "
+                + "       s.avatar_url  AS speaker_avatar_url "
                 + "FROM   [FPTEventManagement].[dbo].[Event]       e "
                 + "JOIN   [FPTEventManagement].[dbo].[Venue_Area]  va ON e.area_id   = va.area_id "
                 + "JOIN   [FPTEventManagement].[dbo].[Venue]       v  ON va.venue_id = v.venue_id "
                 + "LEFT JOIN [FPTEventManagement].[dbo].[Speaker]  s  ON e.speaker_id = s.speaker_id "
                 + "WHERE  e.event_id = ? "
-                + "  AND  e.status = 'OPEN'";
+                + "  AND  (e.status = 'OPEN' OR e.status = 'CLOSED')";
 
+        // ✅ thêm cột description vào truy vấn vé
         String sqlTickets
-                = "SELECT category_ticket_id, name, price, max_quantity, status "
+                = "SELECT category_ticket_id, name, description, price, max_quantity, status "
                 + "FROM   [FPTEventManagement].[dbo].[Category_Ticket] "
                 + "WHERE  event_id = ? AND status = 'ACTIVE'";
 
@@ -83,7 +84,7 @@ public class EventDAO {
                         detail.setMaxSeats(rs.getInt("max_seats"));
                         detail.setStatus(rs.getString("status"));
 
-                        // ✅ banner
+                        // banner
                         detail.setBannerUrl(rs.getString("banner_url"));
 
                         // Venue
@@ -97,14 +98,14 @@ public class EventDAO {
 
                         // Speaker
                         detail.setSpeakerName(rs.getString("speaker_name"));
-                        detail.setSpeakerBio(rs.getString("speaker_bio"));                 // ✅ mới
-                        detail.setSpeakerAvatarUrl(rs.getString("speaker_avatar_url"));    // ✅ mới
+                        detail.setSpeakerBio(rs.getString("speaker_bio"));
+                        detail.setSpeakerAvatarUrl(rs.getString("speaker_avatar_url"));
                     } else {
                         return null;
                     }
                 }
 
-                // 2) Lấy danh sách loại vé
+                // 2) Lấy danh sách loại vé (với description)
                 List<CategoryTicket> tickets = new ArrayList<>();
                 try ( PreparedStatement ps2 = conn.prepareStatement(sqlTickets)) {
                     ps2.setInt(1, eventId);
@@ -114,6 +115,7 @@ public class EventDAO {
                             t.setCategoryTicketId(rs2.getInt("category_ticket_id"));
                             t.setEventId(eventId);
                             t.setName(rs2.getString("name"));
+                            t.setDescription(rs2.getString("description")); // ✅ gán description
                             t.setPrice(rs2.getBigDecimal("price"));
                             t.setMaxQuantity(rs2.getInt("max_quantity"));
                             t.setStatus(rs2.getString("status"));
@@ -128,7 +130,8 @@ public class EventDAO {
             return detail;
         }
     }
-        // ================== GET EVENT BY ID ==================
+    // ================== GET EVENT BY ID ==================
+
     public Event getEventById(int eventId) {
         String sql
                 = "SELECT event_id, title, description, start_time, end_time, "

@@ -16,7 +16,8 @@ public class GetEventDetailController extends HttpServlet {
 
     private final EventDAO eventDAO = new EventDAO();
 
-    // ✅ Serialize null để bannerUrl luôn xuất hiện
+    // Serialize nulls để bannerUrl hoặc các trường null vẫn xuất hiện trong JSON
+    // (FE dễ kiểm tra hơn). Có thể thêm setPrettyPrinting() nếu dev muốn đọc dễ.
     private final Gson gson = new GsonBuilder()
             .serializeNulls()
             .create();
@@ -27,9 +28,6 @@ public class GetEventDetailController extends HttpServlet {
 
         setCorsHeaders(response, request);
         response.setContentType("application/json;charset=UTF-8");
-
-        // ✅ KHÔNG đọc JWT / role / userId
-        // ✅ Guest có thể truy cập
 
         String idParam = request.getParameter("id");
         if (idParam == null || idParam.trim().isEmpty()) {
@@ -52,6 +50,8 @@ public class GetEventDetailController extends HttpServlet {
                 return;
             }
 
+            // CHÚ Ý: EventDetailDto phải có getter cho tickets (List<CategoryTicket>)
+            // và CategoryTicket phải có field description + getter để Gson serialize.
             String json = gson.toJson(detail);
             try (PrintWriter out = response.getWriter()) {
                 out.write(json);

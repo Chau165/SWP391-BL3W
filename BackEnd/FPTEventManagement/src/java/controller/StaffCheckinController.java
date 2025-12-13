@@ -26,6 +26,9 @@ public class StaffCheckinController extends HttpServlet {
     private final Gson gson = new Gson();
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm");
 
+    // ✅ Cho phép check-in sớm 30 phút
+    private static final long EARLY_CHECKIN_MS = 30L * 60L * 1000L; // 30 minutes
+
     // CORS
     private void setCorsHeaders(HttpServletResponse res, HttpServletRequest req) {
         String origin = req.getHeader("Origin");
@@ -164,23 +167,33 @@ public class StaffCheckinController extends HttpServlet {
             Timestamp eventStartTime = event.getStartTime();
             Timestamp eventEndTime = event.getEndTime();
 
-            // Kiểm tra thời gian sự kiện
-            if (eventStartTime != null && now.before(eventStartTime)) {
-                String startTimeStr = dateFormat.format(eventStartTime);
-                item.addProperty("success", false);
-                item.addProperty("message", 
-                    "Sự kiện chưa bắt đầu. Thời gian bắt đầu: " + startTimeStr);
-                item.addProperty("eventStartTime", eventStartTime.toString());
-                failCount++;
-                resultArray.add(item);
-                continue;
+            // ===== ✅ NEW: cho phép check-in sớm 30 phút =====
+            if (eventStartTime != null) {
+                long earliestCheckinMillis = eventStartTime.getTime() - EARLY_CHECKIN_MS;
+                Timestamp earliestCheckinTime = new Timestamp(earliestCheckinMillis);
+
+                // Nếu chưa tới thời điểm check-in sớm
+                if (now.before(earliestCheckinTime)) {
+                    String earliestStr = dateFormat.format(earliestCheckinTime);
+                    String startStr = dateFormat.format(eventStartTime);
+
+                    item.addProperty("success", false);
+                    item.addProperty("message",
+                            "Chưa tới thời gian check-in. Có thể check-in từ: " + earliestStr
+                                    + " (Sự kiện bắt đầu lúc " + startStr + ")");
+                    item.addProperty("earliestCheckinTime", earliestCheckinTime.toString());
+                    item.addProperty("eventStartTime", eventStartTime.toString());
+                    failCount++;
+                    resultArray.add(item);
+                    continue;
+                }
             }
 
+            // Kiểm tra đã quá giờ kết thúc sự kiện chưa (giữ nguyên)
             if (eventEndTime != null && now.after(eventEndTime)) {
                 String endTimeStr = dateFormat.format(eventEndTime);
                 item.addProperty("success", false);
-                item.addProperty("message", 
-                    "Sự kiện đã kết thúc lúc " + endTimeStr);
+                item.addProperty("message", "Sự kiện đã kết thúc lúc " + endTimeStr);
                 item.addProperty("eventEndTime", eventEndTime.toString());
                 failCount++;
                 resultArray.add(item);
@@ -192,12 +205,11 @@ public class StaffCheckinController extends HttpServlet {
             item.addProperty("currentStatus", currentStatus);
 
             if ("CHECKED_IN".equalsIgnoreCase(currentStatus)) {
-                String checkinTimeStr = ticket.getCheckinTime() != null 
-                    ? dateFormat.format(ticket.getCheckinTime()) 
-                    : "không rõ";
+                String checkinTimeStr = ticket.getCheckinTime() != null
+                        ? dateFormat.format(ticket.getCheckinTime())
+                        : "không rõ";
                 item.addProperty("success", false);
-                item.addProperty("message", 
-                    "Vé đã được check-in lúc " + checkinTimeStr);
+                item.addProperty("message", "Vé đã được check-in lúc " + checkinTimeStr);
                 if (ticket.getCheckinTime() != null) {
                     item.addProperty("previousCheckinTime", ticket.getCheckinTime().toString());
                 }
@@ -247,20 +259,18 @@ public class StaffCheckinController extends HttpServlet {
         // ===== 6. Tạo message tổng hợp =====
         String mainMessage;
         boolean isSuccess = (failCount == 0);
-        
+
         if (ticketIds.size() == 1) {
-            // Chỉ có 1 vé
             JsonObject result = resultArray.get(0).getAsJsonObject();
             mainMessage = result.get("message").getAsString();
         } else {
-            // Nhiều vé
             if (isSuccess) {
                 mainMessage = String.format("Check-in thành công %d vé", successCount);
             } else if (successCount == 0) {
                 mainMessage = String.format("Check-in thất bại cho tất cả %d vé", failCount);
             } else {
-                mainMessage = String.format("Check-in thành công %d/%d vé", 
-                    successCount, ticketIds.size());
+                mainMessage = String.format("Check-in thành công %d/%d vé",
+                        successCount, ticketIds.size());
             }
         }
 

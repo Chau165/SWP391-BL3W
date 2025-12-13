@@ -7,17 +7,16 @@ import mylib.DBUtils;
 public class CategoryTicketDAO {
 
     public CategoryTicket getActiveCategoryTicketById(int id) {
-        String sql = "SELECT category_ticket_id, event_id, name, description, price, " +
-                     "       max_quantity, status " +
-                     "FROM Category_Ticket " +
-                     "WHERE category_ticket_id = ? AND status = 'ACTIVE'";
+        String sql = "SELECT category_ticket_id, event_id, name, description, price, "
+                + "       max_quantity, status "
+                + "FROM Category_Ticket "
+                + "WHERE category_ticket_id = ? AND status = 'ACTIVE'";
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, id);
 
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     CategoryTicket ct = new CategoryTicket();
                     ct.setCategoryTicketId(rs.getInt("category_ticket_id"));
@@ -36,11 +35,11 @@ public class CategoryTicketDAO {
         }
         return null;
     }
-    
-        // ================== THÊM MỚI: XÓA TOÀN BỘ CATEGORY_TICKET CỦA 1 EVENT ==================
+
+    // ================== THÊM MỚI: XÓA TOÀN BỘ CATEGORY_TICKET CỦA 1 EVENT ==================
     public void deleteByEventId(Connection conn, int eventId) throws SQLException {
         String sql = "DELETE FROM Category_Ticket WHERE event_id = ?";
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, eventId);
             ps.executeUpdate();
         }
@@ -49,9 +48,9 @@ public class CategoryTicketDAO {
     // ================== THÊM MỚI: INSERT CATEGORY_TICKET CHO 1 EVENT ==================
     public void insertCategoryTicket(Connection conn, CategoryTicket ct) throws SQLException {
         String sql = "INSERT INTO Category_Ticket (event_id, name, description, price, max_quantity, status) "
-                   + "VALUES (?, ?, ?, ?, ?, ?)";
+                + "VALUES (?, ?, ?, ?, ?, ?)";
 
-        try (PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, ct.getEventId());
             ps.setNString(2, ct.getName());
 
@@ -77,5 +76,40 @@ public class CategoryTicketDAO {
 
             ps.executeUpdate();
         }
+    }
+
+    public CategoryTicket getActiveCategoryTicketByEventIdAndName(int eventId, String name) {
+        String sql
+                = "SELECT TOP 1 category_ticket_id, event_id, name, description, price, "
+                + "       max_quantity, status "
+                + "FROM Category_Ticket "
+                + "WHERE event_id = ? "
+                + "  AND LOWER(name) = LOWER(?) "
+                + "  AND status = 'ACTIVE'";
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setInt(1, eventId);
+            ps.setString(2, name); // seatType: VIP / STANDARD / ...
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    CategoryTicket ct = new CategoryTicket();
+                    ct.setCategoryTicketId(rs.getInt("category_ticket_id"));
+                    ct.setEventId(rs.getInt("event_id"));
+                    ct.setName(rs.getString("name"));
+                    ct.setDescription(rs.getString("description"));
+                    ct.setPrice(rs.getBigDecimal("price"));
+                    ct.setMaxQuantity((Integer) rs.getObject("max_quantity")); // có thể null
+                    ct.setStatus(rs.getString("status"));
+                    return ct;
+                }
+            }
+        } catch (Exception e) {
+            System.err.println("[ERROR] getActiveCategoryTicketByEventIdAndName: " + e.getMessage());
+            e.printStackTrace();
+        }
+
+        return null;
     }
 }
