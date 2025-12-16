@@ -11,6 +11,15 @@ public class MyTicketResponse {
     private Timestamp startTime;
     private String status;
     private Timestamp checkInTime;
+    private Timestamp checkOutTime;
+
+    public Timestamp getCheckOutTime() {
+        return checkOutTime;
+    }
+
+    public void setCheckOutTime(Timestamp checkOutTime) {
+        this.checkOutTime = checkOutTime;
+    }
 
     public int getTicketId() {
         return ticketId;

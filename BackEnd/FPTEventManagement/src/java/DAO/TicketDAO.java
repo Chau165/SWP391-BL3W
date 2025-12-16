@@ -237,7 +237,7 @@ public class TicketDAO {
 
     // New: Lấy danh sách vé (kèm thông tin Event + Venue) theo user_id
     public List<MyTicketResponse> getTicketsByUserId(int userId) {
-        String sql = "SELECT t.ticket_id, t.qr_code_value, t.status, t.checkin_time, "
+        String sql = "SELECT t.ticket_id, t.qr_code_value, t.status, t.checkin_time, t.check_out_time, "
                 + " e.title AS event_name, e.start_time AS start_time, v.venue_name AS venue_name "
                 + "FROM Ticket t "
                 + "JOIN Event e ON t.event_id = e.event_id "
@@ -249,6 +249,7 @@ public class TicketDAO {
         List<MyTicketResponse> result = new ArrayList<>();
 
         try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
             ps.setInt(1, userId);
 
             try ( ResultSet rs = ps.executeQuery()) {
@@ -258,10 +259,16 @@ public class TicketDAO {
                     m.setTicketCode(rs.getString("qr_code_value"));
                     m.setStatus(rs.getString("status"));
                     m.setCheckInTime(rs.getTimestamp("checkin_time"));
+
+                    // ✅ thêm check_out_time
+                    m.setCheckOutTime(rs.getTimestamp("check_out_time"));
+
                     m.setEventName(rs.getString("event_name"));
                     m.setStartTime(rs.getTimestamp("start_time"));
+
                     String venue = rs.getString("venue_name");
                     m.setVenueName(venue); // can be null
+
                     result.add(m);
                 }
             }
@@ -395,4 +402,19 @@ public class TicketDAO {
         }
     }
 
+    public boolean checkoutTicket(int ticketId) {
+        String sql = "UPDATE dbo.Ticket "
+                + "SET status = 'CHECKED_OUT', check_out_time = SYSDATETIME() "
+                + "WHERE ticket_id = ? AND status = 'CHECKED_IN'";
+
+        try ( Connection con = DBUtils.getConnection();  PreparedStatement ps = con.prepareStatement(sql)) {
+
+            ps.setInt(1, ticketId);
+            return ps.executeUpdate() > 0;
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
+    }
 }

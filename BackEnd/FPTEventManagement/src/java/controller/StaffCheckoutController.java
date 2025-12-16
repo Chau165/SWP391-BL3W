@@ -7,21 +7,25 @@ import DTO.Event;
 import utils.JwtUtils;
 
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
 import com.google.gson.JsonArray;
+import com.google.gson.JsonObject;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
 
 import service.SystemConfigService;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
+import java.nio.file.Paths;
+
 import java.sql.Timestamp;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.List;
 
-@WebServlet("/api/staff/checkin")
-public class StaffCheckinController extends HttpServlet {
+@WebServlet("/api/staff/checkout")
+public class StaffCheckoutController extends HttpServlet {
 
     private final TicketDAO ticketDAO = new TicketDAO();
     private final EventDAO eventDAO = new EventDAO();
@@ -30,7 +34,7 @@ public class StaffCheckinController extends HttpServlet {
     private final Gson gson = new Gson();
     private final SimpleDateFormat dateFormat = new SimpleDateFormat("dd/MM/yyyy HH:mm");
 
-    // CORS
+    // CORS (copy y hệt checkin)
     private void setCorsHeaders(HttpServletResponse res, HttpServletRequest req) {
         String origin = req.getHeader("Origin");
 
@@ -67,11 +71,11 @@ public class StaffCheckinController extends HttpServlet {
         setCorsHeaders(resp, req);
         resp.setContentType("application/json;charset=UTF-8");
 
-        // ===== 1. Kiểm tra Token =====
+        // 1) Token
         String authHeader = req.getHeader("Authorization");
         if (authHeader == null || !authHeader.startsWith("Bearer ")) {
             resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            resp.getWriter().write("{\"error\":\"Vui lòng đăng nhập để thực hiện check-in\"}");
+            resp.getWriter().write("{\"error\":\"Vui lòng đăng nhập để thực hiện check-out\"}");
             return;
         }
 
@@ -82,15 +86,15 @@ public class StaffCheckinController extends HttpServlet {
             return;
         }
 
-        // ===== 2. Kiểm tra quyền =====
+        // 2) Role
         String role = JwtUtils.getRoleFromToken(token);
         if (role == null || !(role.equalsIgnoreCase("ORGANIZER") || role.equalsIgnoreCase("ADMIN"))) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            resp.getWriter().write("{\"error\":\"Bạn không có quyền thực hiện check-in\"}");
+            resp.getWriter().write("{\"error\":\"Bạn không có quyền thực hiện check-out\"}");
             return;
         }
 
-        // ===== 3. Lấy mã vé từ QR =====
+        // 3) Lấy mã vé từ QR
         String qrValue = req.getParameter("ticketCode");
         if (qrValue == null || qrValue.trim().isEmpty()) {
             qrValue = req.getParameter("ticketId");
@@ -103,9 +107,9 @@ public class StaffCheckinController extends HttpServlet {
         }
 
         qrValue = qrValue.trim();
-        System.out.println("[StaffCheckin] qrValue = " + qrValue);
+        System.out.println("[StaffCheckout] qrValue = " + qrValue);
 
-        // ===== 4. Parse danh sách vé =====
+        // 4) Parse danh sách ticketIds
         List<Integer> ticketIds = new ArrayList<>();
         try {
             if (qrValue.startsWith("TICKETS:")) {
@@ -131,15 +135,27 @@ public class StaffCheckinController extends HttpServlet {
             return;
         }
 
-        // ✅ Load config 1 lần cho toàn request
+        // ✅ Load config 1 lần cho toàn request (đọc đúng file runtime)
+        // YÊU CẦU: SystemConfigService đã có hàm load(ServletContext ctx) như mình gửi trước đó.
         SystemConfigService.SystemConfig cfg = systemConfigService.load(req.getServletContext());
-        int allowBeforeMinutes = cfg.checkinAllowedBeforeStartMinutes; // <- lấy từ SystemConfig.json
-        long earlyCheckinMs = allowBeforeMinutes * 60L * 1000L;
+        int minMinutesAfterStart = cfg.minMinutesAfterStart;
 
-        // ✅ log config đang dùng
-        System.out.println("[StaffCheckin] checkinAllowedBeforeStartMinutes = " + allowBeforeMinutes);
+        // ✅ LOG ra config đang áp dụng + file đang đọc
+        String realPath = req.getServletContext().getRealPath("/WEB-INF/classes/config/SystemConfig.json");
+        System.out.println("[StaffCheckout] CONFIG realPath = " + realPath);
+        System.out.println("[StaffCheckout] minMinutesAfterStart = " + minMinutesAfterStart);
 
-        // ===== 5. Xử lý check-in từng vé =====
+        // (Optional) log raw json để chắc 100% đang đọc đúng file
+        try {
+            if (realPath != null) {
+                String raw = new String(Files.readAllBytes(Paths.get(realPath)), StandardCharsets.UTF_8);
+                System.out.println("[StaffCheckout] CONFIG raw json = " + raw);
+            }
+        } catch (Exception e) {
+            System.out.println("[StaffCheckout] Read config raw failed: " + e.getMessage());
+        }
+
+        // 5) Xử lý check-out từng vé
         Timestamp now = new Timestamp(System.currentTimeMillis());
         JsonArray resultArray = new JsonArray();
         int successCount = 0;
@@ -169,116 +185,89 @@ public class StaffCheckinController extends HttpServlet {
 
             item.addProperty("eventName", event.getTitle());
 
+            // ===== ✅ RULE: chỉ cho check-out sau X phút kể từ lúc event bắt đầu =====
             Timestamp eventStartTime = event.getStartTime();
             Timestamp eventEndTime = event.getEndTime();
 
-            // ===== ✅ RULE: cho phép check-in sớm theo config =====
-            if (eventStartTime != null) {
-                long earliestCheckinMillis = eventStartTime.getTime() - earlyCheckinMs;
-                Timestamp earliestCheckinTime = new Timestamp(earliestCheckinMillis);
-
-                if (now.before(earliestCheckinTime)) {
-                    String earliestStr = dateFormat.format(earliestCheckinTime);
-                    String startStr = dateFormat.format(eventStartTime);
-
-                    item.addProperty("success", false);
-                    item.addProperty("message",
-                            "Chưa tới thời gian check-in. Có thể check-in từ: " + earliestStr
-                                    + " (Sự kiện bắt đầu lúc " + startStr + ", cấu hình: "
-                                    + allowBeforeMinutes + " phút trước khi bắt đầu)");
-                    item.addProperty("earliestCheckinTime", earliestCheckinTime.toString());
-                    item.addProperty("eventStartTime", eventStartTime.toString());
-                    item.addProperty("checkinAllowedBeforeStartMinutes", allowBeforeMinutes);
-                    failCount++;
-                    resultArray.add(item);
-                    continue;
-                }
-            }
-
-            // Kiểm tra đã quá giờ kết thúc sự kiện chưa (giữ nguyên)
-            if (eventEndTime != null && now.after(eventEndTime)) {
-                String endTimeStr = dateFormat.format(eventEndTime);
+            if (eventStartTime == null || eventEndTime == null) {
                 item.addProperty("success", false);
-                item.addProperty("message", "Sự kiện đã kết thúc lúc " + endTimeStr);
-                item.addProperty("eventEndTime", eventEndTime.toString());
+                item.addProperty("message", "Sự kiện không có thời gian hợp lệ để check-out");
                 failCount++;
                 resultArray.add(item);
                 continue;
             }
+
+            long allowCheckoutMs = eventStartTime.getTime() + (minMinutesAfterStart * 60L * 1000L);
+            Timestamp allowCheckoutTime = new Timestamp(allowCheckoutMs);
+
+            if (now.before(allowCheckoutTime)) {
+                String allowStr = dateFormat.format(allowCheckoutTime);
+                item.addProperty("success", false);
+                item.addProperty("message",
+                        "Chưa đủ thời gian để check-out. Có thể check-out từ: " + allowStr
+                                + " (cấu hình: " + minMinutesAfterStart + " phút sau khi bắt đầu)");
+                item.addProperty("allowCheckoutTime", allowCheckoutTime.toString());
+                item.addProperty("minMinutesAfterStart", minMinutesAfterStart);
+                failCount++;
+                resultArray.add(item);
+                continue;
+            }
+            // ===== END RULE =====
 
             String currentStatus = ticket.getStatus();
             item.addProperty("currentStatus", currentStatus);
 
-            if ("CHECKED_IN".equalsIgnoreCase(currentStatus)) {
-                String checkinTimeStr = ticket.getCheckinTime() != null
-                        ? dateFormat.format(ticket.getCheckinTime())
-                        : "không rõ";
+            if ("CHECKED_OUT".equalsIgnoreCase(currentStatus)) {
                 item.addProperty("success", false);
-                item.addProperty("message", "Vé đã được check-in lúc " + checkinTimeStr);
-                if (ticket.getCheckinTime() != null) {
-                    item.addProperty("previousCheckinTime", ticket.getCheckinTime().toString());
-                }
+                item.addProperty("message", "Vé đã được check-out trước đó");
                 failCount++;
                 resultArray.add(item);
                 continue;
             }
 
-            if (!"BOOKED".equalsIgnoreCase(currentStatus)) {
-                String statusMsg;
-                switch (currentStatus.toUpperCase()) {
-                    case "CANCELLED":
-                        statusMsg = "Vé đã bị hủy";
-                        break;
-                    case "EXPIRED":
-                        statusMsg = "Vé đã hết hạn";
-                        break;
-                    case "PENDING":
-                        statusMsg = "Vé chưa được thanh toán";
-                        break;
-                    default:
-                        statusMsg = "Vé có trạng thái không hợp lệ: " + currentStatus;
-                }
+            if (!"CHECKED_IN".equalsIgnoreCase(currentStatus)) {
                 item.addProperty("success", false);
-                item.addProperty("message", statusMsg);
+                item.addProperty("message",
+                        "Không thể check-out vì vé chưa check-in hoặc trạng thái không hợp lệ: " + currentStatus);
                 failCount++;
                 resultArray.add(item);
                 continue;
             }
 
-            boolean ok = ticketDAO.checkinTicket(ticketId, now);
+            boolean ok = ticketDAO.checkoutTicket(ticketId);
             if (!ok) {
                 item.addProperty("success", false);
-                item.addProperty("message", "Không thể check-in vé. Vui lòng thử lại");
+                item.addProperty("message", "Không thể check-out vé. Vui lòng thử lại");
                 failCount++;
             } else {
                 item.addProperty("success", true);
-                item.addProperty("status", "CHECKED_IN");
-                item.addProperty("checkinTime", now.toString());
-                item.addProperty("message", "Check-in thành công vé #" + ticketId);
+                item.addProperty("status", "CHECKED_OUT");
+                item.addProperty("checkoutTime", now.toString());
+                item.addProperty("message", "Check-out thành công vé #" + ticketId);
                 successCount++;
             }
+
             resultArray.add(item);
         }
 
-        // ===== 6. Tạo message tổng hợp =====
-        String mainMessage;
+        // 6) Message tổng hợp
         boolean isSuccess = (failCount == 0);
+        String mainMessage;
 
         if (ticketIds.size() == 1) {
             JsonObject result = resultArray.get(0).getAsJsonObject();
             mainMessage = result.get("message").getAsString();
         } else {
             if (isSuccess) {
-                mainMessage = String.format("Check-in thành công %d vé", successCount);
+                mainMessage = String.format("Check-out thành công %d vé", successCount);
             } else if (successCount == 0) {
-                mainMessage = String.format("Check-in thất bại cho tất cả %d vé", failCount);
+                mainMessage = String.format("Check-out thất bại cho tất cả %d vé", failCount);
             } else {
-                mainMessage = String.format("Check-in thành công %d/%d vé",
-                        successCount, ticketIds.size());
+                mainMessage = String.format("Check-out thành công %d/%d vé", successCount, ticketIds.size());
             }
         }
 
-        // ===== 7. Trả về response =====
+        // 7) Response
         JsonObject resJson = new JsonObject();
         resJson.addProperty("success", isSuccess);
         resJson.addProperty("message", mainMessage);
