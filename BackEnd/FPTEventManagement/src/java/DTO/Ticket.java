@@ -2,18 +2,19 @@ package DTO;
 
 import java.sql.Timestamp;
 
-public class Ticket{
+public class Ticket {
 
     private int ticketId;
     private int eventId;
     private int userId;
     private int categoryTicketId;
-    private Integer billId;     // nullable nếu vé free
-    private Integer seatId;     // nullable nếu không chọn chỗ
+    private Integer billId; // nullable nếu vé free
+    private Integer seatId; // nullable nếu không chọn chỗ
     private String qrCodeValue;
     private Timestamp qrIssuedAt;
-    private String status;      // BOOKED / CHECKED_IN / CANCELLED / EXPIRED
+    private String status; // BOOKED / CHECKED_IN / CANCELLED / EXPIRED
     private Timestamp checkinTime;
+    private Timestamp checkoutTime;
 
     public int getTicketId() {
         return ticketId;
@@ -93,5 +94,13 @@ public class Ticket{
 
     public void setCheckinTime(Timestamp checkinTime) {
         this.checkinTime = checkinTime;
+    }
+
+    public Timestamp getCheckoutTime() {
+        return checkoutTime;
+    }
+
+    public void setCheckoutTime(Timestamp checkoutTime) {
+        this.checkoutTime = checkoutTime;
     }
 }

@@ -24,7 +24,7 @@ public class TicketDAO {
                 + "  qr_code_value, qr_issued_at, status, checkin_time) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, t.getEventId());
             ps.setInt(2, t.getUserId());
@@ -79,7 +79,8 @@ public class TicketDAO {
                 + "  qr_code_value, qr_issued_at, status, checkin_time) "
                 + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try (Connection conn = DBUtils.getConnection();
+                PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setInt(1, t.getEventId());
             ps.setInt(2, t.getUserId());
@@ -122,7 +123,7 @@ public class TicketDAO {
                 return -1;
             }
 
-            try ( ResultSet rs = ps.getGeneratedKeys()) {
+            try (ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     return rs.getInt(1); // ticket_id
                 }
@@ -145,7 +146,7 @@ public class TicketDAO {
                 + "SET qr_code_value = ?, qr_issued_at = ? "
                 + "WHERE ticket_id = ?";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, qrBase64);
             ps.setTimestamp(2, new Timestamp(System.currentTimeMillis()));
@@ -164,14 +165,14 @@ public class TicketDAO {
     public Ticket getTicketById(int ticketId) {
         String sql = "SELECT ticket_id, event_id, user_id, category_ticket_id, "
                 + "       bill_id, seat_id, qr_code_value, qr_issued_at, "
-                + "       status, checkin_time "
+                + "       status, checkin_time, check_out_time "
                 + "FROM Ticket WHERE ticket_id = ?";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, ticketId);
 
-            try ( ResultSet rs = ps.executeQuery()) {
+            try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     Ticket t = new Ticket();
                     t.setTicketId(rs.getInt("ticket_id"));
@@ -184,6 +185,7 @@ public class TicketDAO {
                     t.setQrIssuedAt(rs.getTimestamp("qr_issued_at"));
                     t.setStatus(rs.getString("status"));
                     t.setCheckinTime(rs.getTimestamp("checkin_time"));
+                    t.setCheckoutTime(rs.getTimestamp("check_out_time"));
                     return t;
                 }
             }
@@ -199,11 +201,11 @@ public class TicketDAO {
      */
     public int getTicketId(int eventId, int userId, int categoryId) {
         String sql = "SELECT ticket_id FROM Ticket WHERE event_id = ? AND user_id = ? AND category_ticket_id = ?";
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setInt(1, eventId);
             ps.setInt(2, userId);
             ps.setInt(3, categoryId);
-            try ( ResultSet rs = ps.executeQuery()) {
+            try (ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return rs.getInt("ticket_id");
                 }
@@ -221,7 +223,7 @@ public class TicketDAO {
                 + "SET status = 'CHECKED_IN', checkin_time = ? "
                 + "WHERE ticket_id = ? AND status = 'BOOKED'";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setTimestamp(1, checkinTime);
             ps.setInt(2, ticketId);
@@ -248,11 +250,11 @@ public class TicketDAO {
 
         List<MyTicketResponse> result = new ArrayList<>();
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, userId);
 
-            try ( ResultSet rs = ps.executeQuery()) {
+            try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     MyTicketResponse m = new MyTicketResponse();
                     m.setTicketId(rs.getInt("ticket_id"));
@@ -283,31 +285,46 @@ public class TicketDAO {
     // New: get event statistics (total tickets, checked-in count, check-in rate)
     public DTO.EventStatsDTO getEventStats(int eventId) {
         String sql = "SELECT COUNT(*) AS total, "
-                + "SUM(CASE WHEN status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS checked_in "
+                + "SUM(CASE WHEN status = 'CHECKED_IN' THEN 1 ELSE 0 END) AS checked_in, "
+                + "SUM(CASE WHEN check_out_time IS NOT NULL THEN 1 ELSE 0 END) AS checked_out "
                 + "FROM Ticket WHERE event_id = ? AND status != 'CANCELLED'";
 
-        try ( java.sql.Connection conn = DBUtils.getConnection();  java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (java.sql.Connection conn = DBUtils.getConnection();
+                java.sql.PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, eventId);
 
-            try ( java.sql.ResultSet rs = ps.executeQuery()) {
+            try (java.sql.ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     int total = rs.getInt("total");
                     int checkedIn = rs.getInt("checked_in");
+                    int checkedOut = rs.getInt("checked_out");
 
                     DTO.EventStatsDTO stats = new DTO.EventStatsDTO();
                     stats.setEventId(eventId);
                     stats.setTotalRegistered(total);
                     stats.setTotalCheckedIn(checkedIn);
+                    stats.setTotalCheckedOut(checkedOut);
 
-                    String rate;
+                    // --- Tính Check-in Rate ---
+                    String inRate;
                     if (total <= 0) {
-                        rate = "0%";
+                        inRate = "0%";
                     } else {
                         double r = (checkedIn * 100.0) / total;
-                        rate = String.format("%.2f%%", r);
+                        inRate = String.format("%.2f%%", r);
                     }
-                    stats.setCheckInRate(rate);
+                    stats.setCheckInRate(inRate);
+
+                    // --- Tính Check-out Rate (MỚI) ---
+                    String outRate;
+                    if (total <= 0) {
+                        outRate = "0%";
+                    } else {
+                        double r = (checkedOut * 100.0) / total;
+                        outRate = String.format("%.2f%%", r);
+                    }
+                    stats.setCheckOutRate(outRate); // <--- Set giá trị mới
 
                     return stats;
                 }
@@ -331,14 +348,14 @@ public class TicketDAO {
                 + "qr_code_value, qr_issued_at, status, checkin_time "
                 + "FROM Ticket WHERE ticket_id IN (" + placeholders + ")";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             int idx = 1;
             for (Integer id : ids) {
                 ps.setInt(idx++, id);
             }
 
-            try ( ResultSet rs = ps.executeQuery()) {
+            try (ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     Ticket t = new Ticket();
                     t.setTicketId(rs.getInt("ticket_id"));
@@ -367,7 +384,7 @@ public class TicketDAO {
                 + "qr_issued_at = ? "
                 + "WHERE ticket_id = ?";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             if (t.getBillId() == null) {
                 ps.setNull(1, java.sql.Types.INTEGER);
@@ -391,7 +408,7 @@ public class TicketDAO {
         String placeholders = ids.stream().map(id -> "?").collect(Collectors.joining(","));
         String sql = "DELETE FROM Ticket WHERE ticket_id IN (" + placeholders + ")";
 
-        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
 
             int idx = 1;
             for (Integer id : ids) {
@@ -404,10 +421,10 @@ public class TicketDAO {
 
     public boolean checkoutTicket(int ticketId) {
         String sql = "UPDATE dbo.Ticket "
-                + "SET status = 'CHECKED_OUT', check_out_time = SYSDATETIME() "
+                + "SET status = 'CHECKED_OUT', check_out_time = GETDATE() "
                 + "WHERE ticket_id = ? AND status = 'CHECKED_IN'";
 
-        try ( Connection con = DBUtils.getConnection();  PreparedStatement ps = con.prepareStatement(sql)) {
+        try (Connection con = DBUtils.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setInt(1, ticketId);
             return ps.executeUpdate() > 0;

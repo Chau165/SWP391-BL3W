@@ -1,12 +1,13 @@
 package DTO;
 
-
 public class EventStatsDTO {
 
     private int eventId;
     private int totalRegistered;
     private int totalCheckedIn;
-    private String checkInRate; // e.g., "75.00%"
+    private int totalCheckedOut;
+    private String checkInRate; //
+    private String checkOutRate;
 
     public int getEventId() {
         return eventId;
@@ -32,11 +33,27 @@ public class EventStatsDTO {
         this.totalCheckedIn = totalCheckedIn;
     }
 
+    public int getTotalCheckedOut() {
+        return totalCheckedOut;
+    }
+
+    public void setTotalCheckedOut(int totalCheckedOut) {
+        this.totalCheckedOut = totalCheckedOut;
+    }
+
     public String getCheckInRate() {
         return checkInRate;
     }
 
     public void setCheckInRate(String checkInRate) {
         this.checkInRate = checkInRate;
+    }
+
+    public String getCheckOutRate() {
+        return checkOutRate;
+    }
+
+    public void setCheckOutRate(String checkOutRate) {
+        this.checkOutRate = checkOutRate;
     }
 }
