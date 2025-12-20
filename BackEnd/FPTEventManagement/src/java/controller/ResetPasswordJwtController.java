@@ -1,5 +1,82 @@
 package controller;
 
+/**
+ * ========================================================================================================
+ * CONTROLLER: ResetPasswordJwtController - XÁC THỰC OTP VÀ ĐỔI MẬT KHẨU
+ * ========================================================================================================
+ * 
+ * CHỨC NĂNG:
+ * - Nhận email, OTP và mật khẩu mới từ Frontend
+ * - Verify OTP từ PasswordResetManager
+ * - Kiểm tra OTP hết hạn, số lần nhập sai
+ * - Cập nhật mật khẩu mới vào database (hash SHA-256)
+ * - Vô hiệu hóa OTP sau khi dùng
+ * - Trả về kết quả cho FE
+ * 
+ * ENDPOINT: POST /api/reset-password
+ * 
+ * REQUEST BODY:
+ * {
+ *   "email": "a@fpt.edu.vn",
+ *   "otp": "123456",
+ *   "newPassword": "NewPass123"
+ * }
+ * 
+ * RESPONSE SUCCESS (200):
+ * {
+ *   "status": "success",
+ *   "message": "Đổi mật khẩu thành công"
+ * }
+ * 
+ * RESPONSE ERROR:
+ * - 400 Bad Request: Thiếu field, mật khẩu quá ngắn (<6 ký tự)
+ * - 401 Unauthorized: OTP không đúng hoặc hết hạn
+ * - 404 Not Found: Email không tồn tại
+ * - 500 Internal Server Error: Không thể cập nhật mật khẩu
+ * 
+ * LUỒNG XỬ LÝ:
+ * 1. FE gửi POST request với email, OTP, newPassword
+ * 2. Parse JSON request body
+ * 3. Validate các field không rỗng
+ * 4. Validate mật khẩu mới (tối thiểu 6 ký tự)
+ * 5. Kiểm tra email tồn tại (UsersDAO.getUserByEmail)
+ * 6. Verify OTP (PasswordResetManager.verifyOtp):
+ *    - Kiểm tra OTP khớp
+ *    - Kiểm tra chưa hết hạn (5 phút)
+ *    - Kiểm tra số lần nhập sai < 5
+ *    - Kiểm tra chưa dùng (one-time use)
+ * 7. Nếu OTP hợp lệ: Cập nhật mật khẩu (UsersDAO.updatePasswordByEmail)
+ * 8. DAO tự động hash mật khẩu bằng SHA-256
+ * 9. Vô hiệu hóa OTP (PasswordResetManager.invalidate)
+ * 10. Trả về success response
+ * 11. FE chuyển user về trang login
+ * 
+ * PASSWORD VALIDATION:
+ * - Hiện tại: Tối thiểu 6 ký tự
+ * - Nên thêm: Validation mạnh hơn (chữ hoa, chữ thường, số, ký tự đặc biệt)
+ * - Sử dụng ValidationUtil.isValidPassword() cho nhất quán
+ * 
+ * SECURITY:
+ * - OTP one-time use: Chỉ dùng được 1 lần, tự động vô hiệu hóa sau khi verify thành công
+ * - Max attempts: Tối đa 5 lần nhập sai
+ * - TTL: OTP hết hạn sau 5 phút
+ * - Password hash: Tự động hash SHA-256 trong DAO
+ * - Rate limiting: Nên thêm để tránh brute-force
+ * 
+ * OTP FLOW:
+ * 1. User quên mật khẩu
+ * 2. ForgotPasswordJwtController: Gửi OTP qua email
+ * 3. User nhập OTP + mật khẩu mới
+ * 4. ResetPasswordJwtController: Verify OTP và đổi mật khẩu
+ * 5. User login với mật khẩu mới
+ * 
+ * KẾT NỐI FILE:
+ * - DAO: DAO/UsersDAO.java (cập nhật mật khẩu)
+ * - Manager: utils/PasswordResetManager.java (verify và invalidate OTP)
+ * - Utils: utils/PasswordUtils.java (hash password trong DAO)
+ * - Previous step: controller/ForgotPasswordJwtController.java
+ */
+
 import DAO.UsersDAO;
 import DTO.Users;
 import com.google.gson.Gson;
@@ -11,15 +88,16 @@ import java.io.*;
 
 /**
  * POST /api/reset-password
- * Body: { "email": "xxx@fpt.edu.vn", "otp": "123456", "newPassword": "Abc@123" }
+ * Body: { "email": "xxx@fpt.edu.vn", "otp": "123456", "newPassword": "Abc@123"
+ * }
  *
  * Flow:
- *  1. Kiểm tra email, otp, newPassword không rỗng
- *  2. Kiểm tra mật khẩu đủ mạnh (tối thiểu 6 ký tự – bạn có thể tăng thêm rule)
- *  3. Kiểm tra email có tồn tại trong hệ thống
- *  4. Verify OTP bằng PasswordResetManager (theo email)
- *  5. Nếu OK -> cập nhật mật khẩu mới cho user (hash trong DAO)
- *  6. Vô hiệu hóa OTP sau khi dùng
+ * 1. Kiểm tra email, otp, newPassword không rỗng
+ * 2. Kiểm tra mật khẩu đủ mạnh (tối thiểu 6 ký tự – bạn có thể tăng thêm rule)
+ * 3. Kiểm tra email có tồn tại trong hệ thống
+ * 4. Verify OTP bằng PasswordResetManager (theo email)
+ * 5. Nếu OK -> cập nhật mật khẩu mới cho user (hash trong DAO)
+ * 6. Vô hiệu hóa OTP sau khi dùng
  */
 @WebServlet("/api/reset-password")
 public class ResetPasswordJwtController extends HttpServlet {
@@ -40,6 +118,28 @@ public class ResetPasswordJwtController extends HttpServlet {
         resp.setStatus(HttpServletResponse.SC_OK);
     }
 
+    /**
+     * XỬ LÝ XÁC THỰC OTP VÀ ĐỔI MẬT KHẨU
+     * 
+     * ENDPOINT: POST /api/reset-password
+     * AUTHENTICATION: Không cần JWT (public endpoint)
+     * CONTENT-TYPE: application/json
+     * 
+     * REQUEST FLOW:
+     * 1. Parse email, OTP, newPassword từ request body
+     * 2. Validate các field không rỗng và mật khẩu đủ mạnh
+     * 3. Kiểm tra email tồn tại trong DB
+     * 4. Verify OTP (khớp, chưa hết hạn, chưa dùng)
+     * 5. Cập nhật mật khẩu mới (hash SHA-256)
+     * 6. Vô hiệu hóa OTP
+     * 7. Return success response
+     * 
+     * ERROR HANDLING:
+     * - 400: Field rỗng, mật khẩu quá ngắn
+     * - 401: OTP sai, hết hạn, đã dùng
+     * - 404: Email không tồn tại
+     * - 500: Lỗi database
+     */
     @Override
     protected void doPost(HttpServletRequest request, HttpServletResponse response) throws IOException {
         setCorsHeaders(response, request);

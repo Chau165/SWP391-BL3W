@@ -1,5 +1,77 @@
 package controller;
 
+/**
+ * ========================================================================================================
+ * CONTROLLER: RegisterVerifyOtpController - XÁC THỰC OTP VÀ TẠO TÀI KHOẢN
+ * ========================================================================================================
+ * 
+ * CHỨC NĂNG:
+ * - Nhận email và OTP từ Frontend
+ * - Verify OTP từ OtpCache
+ * - Kiểm tra OTP hết hạn, số lần nhập sai
+ * - Hash password và tạo tài khoản mới trong database
+ * - Sinh JWT token cho user mới
+ * - Trả về token + thông tin user cho FE
+ * 
+ * ENDPOINT: POST /api/register/verify-otp
+ * 
+ * REQUEST BODY:
+ * {
+ *   "email": "a@fpt.edu.vn",
+ *   "otp": "123456"
+ * }
+ * 
+ * RESPONSE SUCCESS (200):
+ * {
+ *   "status": "success",
+ *   "message": "Registered and logged in successfully",
+ *   "token": "eyJhbGc...",
+ *   "user": {
+ *     "id": 123,
+ *     "fullName": "Nguyễn Văn A",
+ *     "email": "a@fpt.edu.vn",
+ *     "phone": "0912345678",
+ *     "role": "STUDENT",
+ *     "status": "ACTIVE"
+ *   }
+ * }
+ * 
+ * RESPONSE ERROR:
+ * - 400: OTP not found / OTP expired / OTP incorrect
+ * - 409: Email already exists (race condition)
+ * - 429: Too many attempts
+ * - 400: Failed to create user
+ * - 500: User created but cannot load profile
+ * 
+ * LUỒNG XỬ LÝ:
+ * 1. Parse request: email + otp
+ * 2. Lấy PendingUser từ OtpCache
+ * 3. Check OTP expired (5 phút)
+ * 4. Check attempts < 5 lần
+ * 5. Verify OTP khớp
+ * 6. Check email chưa tồn tại (double-check)
+ * 7. Hash password (SHA-256)
+ * 8. Insert vào bảng Users
+ * 9. Lấy thông tin user vừa tạo
+ * 10. Xóa OTP khỏi cache
+ * 11. Sinh JWT token
+ * 12. Trả về token + user info
+ * 
+ * SECURITY:
+ * - Password được hash SHA-256 trước khi lưu DB
+ * - OTP chỉ có hiệu lực 5 phút
+ * - Tối đa 5 lần nhập sai OTP
+ * - Sau 5 lần sai: phải request OTP mới
+ * - JWT token có expiration time
+ * 
+ * KẾT NỐI FILE:
+ * - Cache: mylib/OtpCache.java (verify OTP)
+ * - DAO: DAO/UsersDAO.java (create user)
+ * - Utils: utils/JwtUtils.java (generate token)
+ * - Previous step: controller/RegisterSendOtpController.java
+ * - Next step: FE lưu token và chuyển về trang chủ
+ */
+
 import DAO.UsersDAO;
 import DTO.Users;
 import com.google.gson.Gson;
@@ -35,7 +107,7 @@ public class RegisterVerifyOtpController extends HttpServlet {
         setCorsHeaders(resp, req);
         resp.setContentType("application/json;charset=UTF-8");
 
-        try ( BufferedReader reader = req.getReader();  PrintWriter out = resp.getWriter()) {
+        try (BufferedReader reader = req.getReader(); PrintWriter out = resp.getWriter()) {
             VerifyRequest input = gson.fromJson(reader, VerifyRequest.class);
 
             if (input == null || input.email == null || input.otp == null) {
@@ -122,7 +194,7 @@ public class RegisterVerifyOtpController extends HttpServlet {
                 || origin.contains("ngrok-free.app")
                 || // ⭐ Cho phép ngrok
                 origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
-                );
+        );
 
         if (allowed) {
             res.setHeader("Access-Control-Allow-Origin", origin);

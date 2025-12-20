@@ -1,5 +1,67 @@
 package utils;
 
+/**
+ * ========================================================================================================
+ * UTILS: JwtUtils - GENERATE VÀ PARSE JWT TOKEN
+ * ========================================================================================================
+ * 
+ * CHỨC NĂNG:
+ * - Tạo JWT token cho user sau khi login/register thành công
+ * - Parse và validate JWT token từ request header
+ * - Trích xuất thông tin user từ token (userId, email, role)
+ * 
+ * JWT (JSON Web Token):
+ * - Token format: header.payload.signature
+ * - Header: Algorithm (HS256) + Token type (JWT)
+ * - Payload: Claims (userId, email, role, issued time, expiration time)
+ * - Signature: HMAC-SHA256(header + payload, SECRET_KEY)
+ * 
+ * SECRET KEY:
+ * - Lưu trong JwtConfig.SECRET_KEY (Key object)
+ * - Dùng để ký và verify token
+ * - PHẢI GIỮ BÍ MẬT, không commit lên Git
+ * 
+ * EXPIRATION:
+ * - JwtConfig.EXPIRATION_TIME = 7 ngày (hoặc tùy config)
+ * - Sau khi hết hạn: token invalid, user phải login lại
+ * 
+ * METHODS:
+ * 1. generateToken(email, role, id): Tạo JWT token mới
+ * 2. parseToken(token): Parse token ra JwtUser (userId, email, role)
+ * 3. validateToken(token): Kiểm tra token hợp lệ (chưa hết hạn, chữ ký đúng)
+ * 4. getEmailFromToken(token): Lấy email từ token
+ * 5. getRoleFromToken(token): Lấy role từ token
+ * 6. getIdFromToken(token): Lấy userId từ token
+ * 
+ * JWT CLAIMS:
+ * - subject: email
+ * - role: STUDENT / ADMIN / ORGANIZER
+ * - id: userId (primary key)
+ * - issuedAt: Thời điểm tạo token
+ * - expiration: Thời điểm token hết hạn
+ * 
+ * LUỒNG SỬ DỤNG:
+ * 1. User login/register thành công
+ * 2. Backend gọi generateToken(email, role, id)
+ * 3. Trả token cho FE trong response
+ * 4. FE lưu token (localStorage / sessionStorage)
+ * 5. FE gửi token trong header: Authorization: Bearer <token>
+ * 6. JwtAuthFilter gọi parseToken() để xác thực
+ * 7. Nếu valid: set userId vào request.setAttribute("userId")
+ * 8. Controller lấy userId từ attribute
+ * 
+ * SECURITY:
+ * - Token được ký bằng SECRET_KEY, không thể giả mạo
+ * - Hết hạn tự động sau EXPIRATION_TIME
+ * - HTTPS: Token phải truyền qua HTTPS để tránh bị đánh cắp
+ * - Refresh token: Nên thêm refresh token cho UX tốt hơn
+ * 
+ * SỬ DỤNG:
+ * - Controller: LoginController, RegisterVerifyOtpController (generate token)
+ * - Filter: filter/JwtAuthFilter.java (parse và validate token)
+ * - Config: utils/JwtConfig.java (SECRET_KEY, EXPIRATION_TIME)
+ */
+
 import io.jsonwebtoken.*;
 import java.util.Date;
 import java.util.HashMap;
@@ -71,7 +133,8 @@ public class JwtUtils {
             } else if (idObj != null) {
                 try {
                     userId = Integer.parseInt(idObj.toString());
-                } catch (NumberFormatException ignored) {}
+                } catch (NumberFormatException ignored) {
+                }
             }
 
             if (email == null || role == null || userId == null) {

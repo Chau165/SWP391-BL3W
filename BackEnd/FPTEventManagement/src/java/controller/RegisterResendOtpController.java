@@ -1,5 +1,64 @@
 package controller;
 
+/**
+ * ========================================================================================================
+ * CONTROLLER: RegisterResendOtpController - GỬI LẠI MÃ OTP
+ * ========================================================================================================
+ * 
+ * CHỨC NĂNG:
+ * - Gửi lại OTP mới khi user chưa nhận được email hoặc OTP hết hạn
+ * - Kiểm tra cooldown (60 giây giữa các lần gửi)
+ * - Giới hạn số lần gửi lại (tối đa 5 lần)
+ * - Sinh OTP mới và cập nhật cache
+ * - Gửi OTP mới qua email
+ * 
+ * ENDPOINT: POST /api/register/resend-otp
+ * 
+ * REQUEST BODY:
+ * {
+ *   "email": "a@fpt.edu.vn"
+ * }
+ * 
+ * RESPONSE SUCCESS (200):
+ * {
+ *   "status": "otp_resent",
+ *   "message": "OTP has been resent to your email"
+ * }
+ * 
+ * RESPONSE ERROR:
+ * - 400: No pending registration (chưa gọi send-otp)
+ * - 429: Resend blocked (chưa đủ 60s hoặc quá 5 lần)
+ * - 502: Failed to send email
+ * 
+ * BUSINESS RULES:
+ * - Cooldown: 60 giây giữa các lần gửi (tránh spam)
+ * - Max resend: 5 lần (sau đó phải đăng ký lại từ đầu)
+ * - OTP mới có TTL 5 phút
+ * - Giữ nguyên thông tin đăng ký (fullName, phone, password)
+ * - Reset attempt counter khi gửi OTP mới
+ * 
+ * LUỒNG XỬ LÝ:
+ * 1. Parse request: email
+ * 2. Lấy PendingUser từ OtpCache
+ * 3. Check cache tồn tại (có request send-otp trước đó)
+ * 4. Check cooldown (now - lastSentAt >= 60s)
+ * 5. Check resend count < 5
+ * 6. Sinh OTP mới
+ * 7. Gửi email OTP mới
+ * 8. Update cache: otp, expiresAt, lastSentAt, resendCount++
+ * 9. Trả về success response
+ * 
+ * ANTI-SPAM:
+ * - Cooldown 60s: Không cho gửi liên tục
+ * - Max 5 lần: Tránh abuse email service
+ * - Nên thêm rate limiting theo IP
+ * 
+ * KẾT NỐI FILE:
+ * - Cache: mylib/OtpCache.java (update OTP)
+ * - Service: mylib/EmailService.java (send email)
+ * - Related: controller/RegisterSendOtpController.java, RegisterVerifyOtpController.java
+ */
+
 import com.google.gson.Gson;
 import mylib.EmailService;
 import mylib.OtpCache;
@@ -32,7 +91,7 @@ public class RegisterResendOtpController extends HttpServlet {
         setCorsHeaders(resp, req);
         resp.setContentType("application/json;charset=UTF-8");
 
-        try ( BufferedReader reader = req.getReader();  PrintWriter out = resp.getWriter()) {
+        try (BufferedReader reader = req.getReader(); PrintWriter out = resp.getWriter()) {
             ResendRequest input = gson.fromJson(reader, ResendRequest.class);
 
             if (input == null || input.email == null) {
@@ -79,7 +138,7 @@ public class RegisterResendOtpController extends HttpServlet {
                 || origin.contains("ngrok-free.app")
                 || // ⭐ Cho phép ngrok
                 origin.contains("ngrok.app") // ⭐ (phòng trường hợp domain mới)
-                );
+        );
 
         if (allowed) {
             res.setHeader("Access-Control-Allow-Origin", origin);

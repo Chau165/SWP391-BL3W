@@ -1,5 +1,93 @@
 package mylib;
 
+/**
+ * ========================================================================================================
+ * SERVICE: EmailService - GỬI EMAIL QUA SMTP (GMAIL)
+ * ========================================================================================================
+ * 
+ * CHỨC NĂNG:
+ * - Gửi email OTP đăng ký tài khoản
+ * - Gửi email tùy chỉnh (thông báo sự kiện, reset password...)
+ * - Sinh mã OTP 6 chữ số ngẫu nhiên
+ * - Sử dụng SMTP Gmail với App Password
+ * 
+ * SMTP CONFIGURATION:
+ * - Host: smtp.gmail.com
+ * - Port: 587 (STARTTLS)
+ * - Protocol: TLSv1.2
+ * - Auth: Username (email) + App Password
+ * 
+ * EMAIL CREDENTIALS:
+ * - EMAIL_FROM: evbatteryswap.system@gmail.com (email gửi đi)
+ * - EMAIL_PASSWORD: mzqbrzycduxhvbnr (App Password - KHÔNG phải mật khẩu Gmail thường)
+ * - LƯU Ý: KHÔNG hard-code trong production, dùng environment variable
+ * 
+ * APP PASSWORD LÀ GÌ?
+ * - App Password: Mật khẩu đặc biệt do Google sinh ra cho ứng dụng bên ngoài
+ * - Không dùng mật khẩu Gmail thường (bảo mật hơn)
+ * - Tạo ở: Google Account -> Security -> 2-Step Verification -> App passwords
+ * - Format: 16 ký tự, không có khoảng trắng
+ * 
+ * METHODS:
+ * 1. sendRegistrationOtpEmail(toEmail, otp):
+ *    - Gửi email chứa mã OTP đăng ký
+ *    - Template HTML đẹp, responsive
+ *    - Subject: "Xác thực email đăng ký - FPT Event"
+ *    - Return: true = success, false = failed
+ * 
+ * 2. sendCustomEmail(toEmail, subject, htmlContent):
+ *    - Gửi email tùy chỉnh (cho các mục đích khác)
+ *    - Subject và nội dung HTML do caller cung cấp
+ *    - Return: true = success, false = failed
+ * 
+ * 3. createSession():
+ *    - Tạo SMTP session với Gmail
+ *    - Config STARTTLS, authentication
+ *    - Private helper method
+ * 
+ * 4. generateOtp():
+ *    - Sinh mã OTP 6 chữ số ngẫu nhiên (100000 - 999999)
+ *    - Return: String "123456"
+ * 
+ * EMAIL TEMPLATE (OTP):
+ * - HTML format với CSS inline
+ * - Hiển thị OTP to, rõ ràng trong box màu xanh
+ * - Thông báo OTP có hiệu lực 5 phút
+ * - Chữ ký: FPT Event Management
+ * - Responsive, hiển thị tốt trên mobile
+ * 
+ * LUỒNG GỬI EMAIL:
+ * 1. Controller gọi EmailService.generateOtp()
+ * 2. Controller gọi EmailService.sendRegistrationOtpEmail(email, otp)
+ * 3. EmailService.createSession() tạo SMTP connection
+ * 4. Tạo MimeMessage với HTML content
+ * 5. Transport.send(message) gửi email qua Gmail SMTP
+ * 6. Return true/false
+ * 
+ * ERROR HANDLING:
+ * - Catch Exception: MessagingException, UnsupportedEncodingException
+ * - Log error ra console để debug
+ * - Return false nếu gửi thất bại
+ * 
+ * GMAIL SMTP LIMITS:
+ * - Free Gmail: 500 emails/day
+ * - Google Workspace: 2000 emails/day
+ * - Rate limit: 100 emails/minute
+ * - Nếu vượt: blocked tạm thời 24h
+ * 
+ * PRODUCTION BEST PRACTICES:
+ * - Dùng email service chuyên nghiệp: SendGrid, AWS SES, Mailgun
+ * - Lưu credentials trong environment variables
+ * - Thêm email queue để không block request
+ * - Monitor email delivery rate
+ * - Handle bounce, spam complaints
+ * 
+ * SỬ DỤNG:
+ * - Controller: RegisterSendOtpController, RegisterResendOtpController
+ * - Cache: OtpCache (lưu OTP sau khi sinh)
+ * - Config: SMTP settings (host, port, credentials)
+ */
+
 import java.util.Properties;
 import javax.mail.Authenticator;
 import javax.mail.PasswordAuthentication;
@@ -20,7 +108,7 @@ public class EmailService {
     private static final String SMTP_HOST = "smtp.gmail.com";
     private static final String SMTP_PORT = "587";
     private static final String EMAIL_FROM = "evbatteryswap.system@gmail.com"; // thay bằng mail của project mới nếu cần
-    private static final String EMAIL_PASSWORD = "mzqbrzycduxhvbnr";          // App Password
+    private static final String EMAIL_PASSWORD = "mzqbrzycduxhvbnr"; // App Password
 
     // ================== 1) GỬI EMAIL OTP ĐĂNG KÝ ==================
     public static boolean sendRegistrationOtpEmail(String toEmail, String otp) {
@@ -57,7 +145,8 @@ public class EmailService {
         }
     }
 
-    // ================== 2) GỬI EMAIL TÙY CHỈNH (NẾU CẦN DÙNG SAU NÀY) ==================
+    // ================== 2) GỬI EMAIL TÙY CHỈNH (NẾU CẦN DÙNG SAU NÀY)
+    // ==================
     public static boolean sendCustomEmail(String toEmail, String subject, String htmlContent) {
         try {
             Session session = createSession();

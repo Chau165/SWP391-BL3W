@@ -1,5 +1,71 @@
 package controller;
 
+/**
+ * ========================================================================================================
+ * CONTROLLER: VenueController - CRUD ĐỊA ĐIỂM TỔ CHỨC (VENUE)
+ * ========================================================================================================
+ * 
+ * CHỨC NĂNG:
+ * - CRUD operations cho Venue (địa điểm tổ chức sự kiện)
+ * - GET: Public (không cần JWT) - Lấy danh sách với nested areas
+ * - POST/PUT/DELETE: Bắt buộc JWT + STAFF role
+ * - Hiển thị venue và các khu vực (areas) cho ORGANIZER tạo event
+ * 
+ * ENDPOINT: /api/venues
+ * - GET: Lấy tất cả venues với nested areas (Public)
+ * - POST: Tạo venue mới (STAFF only)
+ * - PUT: Cập nhật venue (STAFF only)
+ * - DELETE: Soft delete venue (STAFF only)
+ * 
+ * DATABASE:
+ * - Venue: Địa điểm tổ chức (ví dụ: FPT University, Conference Center...)
+ * - Venue_Area: Khu vực trong venue (Hall A, Room 101...)
+ * - Quan hệ: Venue 1:N Venue_Area
+ * 
+ * GET /api/venues - LẤY DANH SÁCH VENUES:
+ * - Public endpoint (không cần JWT)
+ * - Trả về List<Venue> với nested areas
+ * - VenueDAO.getAllVenues() query LEFT JOIN Venue_Area
+ * - Response: [{ venueId, venueName, address, status, areas: [...] }]
+ * 
+ * POST /api/venues - TẠO VENUE MỚI:
+ * - STAFF role required
+ * - Request body: { venueName, address }
+ * - VenueService.createVenue() validate và insert DB
+ * - Default status = "AVAILABLE"
+ * - Return: { status: "success", message: "Venue created" }
+ * 
+ * PUT /api/venues - CẬP NHẬT VENUE:
+ * - STAFF role required
+ * - Request body: { venueId, venueName, address, status }
+ * - VenueService.updateVenue() validate và update DB
+ * - Kiểm tra venueId tồn tại trước khi update
+ * 
+ * DELETE /api/venues?id=X - XÓA VENUE:
+ * - STAFF role required
+ * - Soft delete: Set status = "UNAVAILABLE"
+ * - VenueService.softDeleteVenue(venueId)
+ * - Không xóa vật lý khỏi DB (giữ dữ liệu lịch sử)
+ * 
+ * AUTHORIZATION:
+ * - JWT token từ header "Authorization: Bearer <token>"
+ * - JwtUtils.validateToken() kiểm tra token hợp lệ
+ * - JwtUtils.getRoleFromToken() lấy role
+ * - Chỉ STAFF mới được CUD operations
+ * 
+ * USE CASES:
+ * - FE: Hiển thị dropdown chọn venue khi ORGANIZER tạo event
+ * - Admin: Quản lý danh sách venues và areas
+ * - ORGANIZER: Xem venue trống để đặt lịch event
+ * 
+ * KẾT NỐI FILE:
+ * - Service: service/VenueService.java (business logic)
+ * - DAO: DAO/VenueDAO.java (database operations)
+ * - DTO: DTO/Venue.java, DTO/VenueArea.java
+ * - Utils: utils/JwtUtils.java (authentication)
+ * - Related: controller/GetFreeAreasController.java (kiểm tra area trống)
+ */
+
 import DTO.Venue;
 import com.google.gson.Gson;
 import service.VenueService;
@@ -176,7 +242,8 @@ public class VenueController extends HttpServlet {
             out.print(gson.toJson(m));
             return;
         }
-        // Parse JSON body explicitly for the required fields: venueId, venueName, address, status
+        // Parse JSON body explicitly for the required fields: venueId, venueName,
+        // address, status
         Map body;
         try {
             body = gson.fromJson(sb.toString(), Map.class);
@@ -294,7 +361,8 @@ public class VenueController extends HttpServlet {
             StringBuilder sb = new StringBuilder();
             try (BufferedReader reader = req.getReader()) {
                 String line;
-                while ((line = reader.readLine()) != null) sb.append(line);
+                while ((line = reader.readLine()) != null)
+                    sb.append(line);
             } catch (Exception ignored) {
             }
             if (sb.length() > 0) {

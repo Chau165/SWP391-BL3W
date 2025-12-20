@@ -4,7 +4,7 @@ import DAO.EventDAO;
 import DAO.EventRequestDAO;
 import DAO.SpeakerDAO;
 import DAO.CategoryTicketDAO;
-import DAO.EventSeatLayoutDAO; // ✅ dùng layout theo event
+import DAO.EventSeatLayoutDAO;
 
 import DTO.Event;
 import DTO.EventRequest;
@@ -30,13 +30,13 @@ import java.util.List;
 public class UpdateEventDetailsController extends HttpServlet {
 
     private final Gson gson = new GsonBuilder().setPrettyPrinting().create();
+
     private final EventDAO eventDAO = new EventDAO();
     private final EventRequestDAO eventRequestDAO = new EventRequestDAO();
     private final SpeakerDAO speakerDAO = new SpeakerDAO();
     private final CategoryTicketDAO categoryTicketDAO = new CategoryTicketDAO();
-    private final EventSeatLayoutDAO eventSeatLayoutDAO = new EventSeatLayoutDAO(); // ✅
+    private final EventSeatLayoutDAO eventSeatLayoutDAO = new EventSeatLayoutDAO();
 
-    // ====== DTO cho request body ======
     private static class UpdateEventDetailsRequest {
         Integer eventId;
         SpeakerDTO speaker;
@@ -79,7 +79,7 @@ public class UpdateEventDetailsController extends HttpServlet {
         PrintWriter out = resp.getWriter();
 
         try {
-            // 1. Auth + role
+            // ======================= (1) AUTH + ROLE =======================
             String authHeader = req.getHeader("Authorization");
             if (authHeader == null || !authHeader.startsWith("Bearer ")) {
                 resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
@@ -104,7 +104,7 @@ public class UpdateEventDetailsController extends HttpServlet {
                 return;
             }
 
-            // 2. Read body
+            // ======================= (2) READ BODY JSON =======================
             StringBuilder sb = new StringBuilder();
             try (BufferedReader reader = req.getReader()) {
                 String line;
@@ -112,6 +112,7 @@ public class UpdateEventDetailsController extends HttpServlet {
                     sb.append(line);
                 }
             }
+
             UpdateEventDetailsRequest body = gson.fromJson(sb.toString(), UpdateEventDetailsRequest.class);
 
             if (body == null || body.eventId == null) {
@@ -120,7 +121,7 @@ public class UpdateEventDetailsController extends HttpServlet {
                 return;
             }
 
-            // 3. Lấy event
+            // ======================= (3) GET EVENT =======================
             Event event = eventDAO.getEventById(body.eventId);
             if (event == null) {
                 resp.setStatus(HttpServletResponse.SC_NOT_FOUND);
@@ -128,7 +129,7 @@ public class UpdateEventDetailsController extends HttpServlet {
                 return;
             }
 
-            // 4. Check owner (student requester)
+            // ======================= (4) CHECK OWNER =======================
             EventRequest eventRequest = eventRequestDAO.getByCreatedEventId(body.eventId);
             if (eventRequest == null || !eventRequest.getRequesterId().equals(userId)) {
                 resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
@@ -136,105 +137,155 @@ public class UpdateEventDetailsController extends HttpServlet {
                 return;
             }
 
-            // 5. Không cho update nếu event bị CANCELLED
+            // ======================= (5) CHECK EVENT STATUS =======================
             if ("CANCELLED".equalsIgnoreCase(event.getStatus())) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 out.write("{\"error\":\"Event is not editable in current status\"}");
                 return;
             }
 
-            // 6. Validate tickets + max_seats
+            // ======================= (6) VALIDATE INPUT =======================
+            // Tickets có thể optional nếu bạn muốn chỉ update speaker/banner.
+            // Nhưng theo UI của bạn thì tickets luôn có => mình giữ check này.
             if (body.tickets == null || body.tickets.isEmpty()) {
                 resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                 out.write("{\"error\":\"At least one ticket type is required\"}");
                 return;
             }
 
-            int sumQuantity = 0;
-            int vipCount = 0;
-            int standardCount = 0;
+            // Rule: nếu event đang OPEN => không cho đổi quantity
+            boolean lockQuantity = "OPEN".equalsIgnoreCase(event.getStatus());
 
-            for (TicketDTO t : body.tickets) {
-                if (t.maxQuantity == null || t.maxQuantity <= 0) {
-                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                    out.write("{\"error\":\"Ticket maxQuantity must be > 0\"}");
-                    return;
-                }
-                sumQuantity += t.maxQuantity;
-
-                String typeName = (t.name != null) ? t.name.trim().toUpperCase() : "";
-                if (typeName.contains("VIP")) {
-                    vipCount += t.maxQuantity;
-                } else {
-                    standardCount += t.maxQuantity;
-                }
-            }
-
-            if (sumQuantity > event.getMaxSeats()) {
-                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-                out.write("{\"error\":\"Total ticket quantity exceeds event max_seats\"}");
-                return;
-            }
-
-            // 7. Transaction
+            // ======================= (7) TRANSACTION =======================
             Connection conn = null;
             try {
                 conn = mylib.DBUtils.getConnection();
                 conn.setAutoCommit(false);
 
-                // 7.1 Speaker
-                Integer speakerId = null;
+                // ---------- 7.1 Speaker: update an toàn ----------
                 if (body.speaker != null) {
-                    Speaker sp = new Speaker();
-                    sp.setFullName(body.speaker.fullName);
-                    sp.setBio(body.speaker.bio);
-                    sp.setEmail(body.speaker.email);
-                    sp.setPhone(body.speaker.phone);
-                    sp.setAvatarUrl(body.speaker.avatarUrl);
+                    // Nếu event đã có speaker_id => update speaker đó
+                    // Nếu chưa có => insert mới + gán speaker_id
+                    Integer currentSpeakerId = event.getSpeakerId();
 
-                    speakerId = speakerDAO.insertSpeaker(conn, sp);
+                    if (currentSpeakerId != null) {
+                        Speaker sp = new Speaker();
+                        sp.setSpeakerId(currentSpeakerId);
+                        sp.setFullName(body.speaker.fullName);
+                        sp.setBio(body.speaker.bio);
+                        sp.setEmail(body.speaker.email);
+                        sp.setPhone(body.speaker.phone);
+                        sp.setAvatarUrl(body.speaker.avatarUrl);
+
+                        // Bạn cần có hàm updateSpeaker(conn, sp)
+                        speakerDAO.updateSpeaker(conn, sp);
+
+                    } else {
+                        Speaker sp = new Speaker();
+                        sp.setFullName(body.speaker.fullName);
+                        sp.setBio(body.speaker.bio);
+                        sp.setEmail(body.speaker.email);
+                        sp.setPhone(body.speaker.phone);
+                        sp.setAvatarUrl(body.speaker.avatarUrl);
+
+                        Integer newSpeakerId = speakerDAO.insertSpeaker(conn, sp);
+                        if (newSpeakerId != null) {
+                            eventDAO.updateSpeakerForEvent(conn, body.eventId, newSpeakerId);
+                        }
+                    }
                 }
 
-                if (speakerId != null) {
-                    eventDAO.updateSpeakerForEvent(conn, body.eventId, speakerId);
-                }
-
-                // 7.3 banner_url
+                // ---------- 7.2 Banner ----------
                 if (body.bannerUrl != null) {
                     eventDAO.updateBannerUrlForEvent(conn, body.eventId, body.bannerUrl);
                 }
 
-                // 7.4 Xoá ticket cũ
-                categoryTicketDAO.deleteByEventId(conn, body.eventId);
-
-                // 7.5 Insert ticket mới
+                // ---------- 7.3 Update ticket info (KHÔNG DELETE) ----------
                 for (TicketDTO t : body.tickets) {
-                    CategoryTicket ct = new CategoryTicket();
-                    ct.setEventId(body.eventId);
-                    ct.setName(t.name);
-                    ct.setDescription(t.description);
-                    ct.setPrice(t.price);
-                    ct.setMaxQuantity(t.maxQuantity);
-                    ct.setStatus(t.status != null ? t.status : "ACTIVE");
+                    if (t == null || t.name == null || t.name.trim().isEmpty()) {
+                        throw new IllegalArgumentException("Ticket name is required");
+                    }
+                    if (t.price == null || t.price.compareTo(BigDecimal.ZERO) <= 0) {
+                        throw new IllegalArgumentException("Ticket price must be > 0");
+                    }
 
-                    categoryTicketDAO.insertCategoryTicket(conn, ct);
+                    String normalizedName = t.name.trim();
+                    String status = (t.status != null && !t.status.trim().isEmpty()) ? t.status.trim() : "ACTIVE";
+
+                    // Tìm ticket type hiện tại theo (eventId, name)
+                    CategoryTicket existing = categoryTicketDAO.getByEventIdAndName(conn, body.eventId, normalizedName);
+
+                    if (existing == null) {
+                        // Nếu event OPEN mà lại thêm loại vé mới => thường nên chặn.
+                        // Nếu bạn muốn chặn cứng thì throw:
+                        // throw new RuntimeException("EVENT_OPEN_CANNOT_ADD_NEW_TICKET_TYPE");
+
+                        // Mặc định: vẫn cho insert nếu chưa tồn tại (linh hoạt)
+                        CategoryTicket ct = new CategoryTicket();
+                        ct.setEventId(body.eventId);
+                        ct.setName(normalizedName);
+                        ct.setDescription(t.description);
+                        ct.setPrice(t.price);
+                        ct.setMaxQuantity(t.maxQuantity != null ? t.maxQuantity : 0); // nếu OPEN bạn có thể yêu cầu bắt buộc
+                        ct.setStatus(status);
+
+                        categoryTicketDAO.insertCategoryTicket(conn, ct);
+
+                    } else {
+                        // ✅ Update mô tả / giá / status
+                        categoryTicketDAO.updateTicketInfoExceptQuantity(
+                                conn,
+                                existing.getCategoryTicketId(),
+                                t.description,
+                                t.price,
+                                status
+                        );
+
+                        // ❌ Quantity:
+                        // - nếu event chưa OPEN thì cho đổi quantity (tuỳ bạn)
+                        // - nếu OPEN thì bỏ qua quantity (lock)
+                        if (!lockQuantity) {
+                            if (t.maxQuantity != null && t.maxQuantity > 0) {
+                                categoryTicketDAO.updateMaxQuantity(
+                                        conn,
+                                        existing.getCategoryTicketId(),
+                                        t.maxQuantity
+                                );
+                            }
+                        }
+                    }
                 }
 
-                // 🔥 7.5b: Re-config layout ghế cho riêng event này
-                int areaId = event.getAreaId();
+                // ---------- 7.4 Layout: nếu OPEN thì không reconfigure ----------
+                // Nếu bạn muốn: chỉ reconfigure khi event chưa OPEN
+                if (!lockQuantity) {
+                    int vipCount = 0;
+                    int standardCount = 0;
 
-                eventSeatLayoutDAO.reconfigureSeatsForEvent(
-                        conn,
-                        body.eventId,
-                        areaId,
-                        vipCount,
-                        standardCount
-                );
+                    for (TicketDTO t : body.tickets) {
+                        int q = (t.maxQuantity != null) ? t.maxQuantity : 0;
+                        String typeName = (t.name != null) ? t.name.trim().toUpperCase() : "";
+                        if (typeName.contains("VIP")) vipCount += q;
+                        else standardCount += q;
+                    }
 
-                // 7.6 Cập nhật status event → OPEN
-                boolean updatedStatus = eventDAO.updateEventStatus(conn, body.eventId, "OPEN");
-                if (!updatedStatus) {
-                    throw new RuntimeException("Failed to update event status to OPEN");
+                    int areaId = event.getAreaId();
+                    eventSeatLayoutDAO.reconfigureSeatsForEvent(
+                            conn,
+                            body.eventId,
+                            areaId,
+                            vipCount,
+                            standardCount
+                    );
+                }
+
+                // ---------- 7.5 Nếu event chưa OPEN, bạn có thể set OPEN ở đây ----------
+                // Còn event OPEN rồi thì thôi.
+                if (!"OPEN".equalsIgnoreCase(event.getStatus())) {
+                    boolean updatedStatus = eventDAO.updateEventStatus(conn, body.eventId, "OPEN");
+                    if (!updatedStatus) {
+                        throw new RuntimeException("Failed to update event status to OPEN");
+                    }
                 }
 
                 conn.commit();
@@ -244,14 +295,23 @@ public class UpdateEventDetailsController extends HttpServlet {
 
             } catch (Exception e) {
                 if (conn != null) {
-                    try {
-                        conn.rollback();
-                    } catch (SQLException ignored) {}
+                    try { conn.rollback(); } catch (SQLException ignored) {}
                 }
                 e.printStackTrace();
 
                 String msg = e.getMessage();
+
+                // Nếu bạn bật chặn add ticket type khi OPEN:
+                if ("EVENT_OPEN_CANNOT_ADD_NEW_TICKET_TYPE".equals(msg)) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    out.write("{\"error\":\"Event is OPEN. Cannot add new ticket types.\"}");
+                    return;
+                }
+
                 if (msg != null && msg.startsWith("Not enough physical seats")) {
+                    resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                    out.write("{\"error\":\"" + msg + "\"}");
+                } else if (msg != null && (msg.contains("Ticket price") || msg.contains("Ticket name"))) {
                     resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
                     out.write("{\"error\":\"" + msg + "\"}");
                 } else {

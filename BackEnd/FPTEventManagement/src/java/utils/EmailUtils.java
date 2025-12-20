@@ -1,5 +1,114 @@
 package utils;
 
+/**
+ * ========================================================================================================
+ * UTILS: EmailUtils - GỬI EMAIL VỚI HÌNH ẢNH INLINE
+ * ========================================================================================================
+ * 
+ * CHỨC NĂNG:
+ * - Gửi email với hình ảnh inline (embedded image trong HTML)
+ * - Gửi email OTP đăng ký (giữ lại tương thích với EmailService)
+ * - Gửi email tùy chỉnh (thông báo, reset password...)
+ * - Sinh mã OTP 6 chữ số
+ * - Sử dụng SMTP Gmail với App Password
+ * 
+ * SO SÁNH VỚI EmailService:
+ * - EmailService.java: Gửi email đơn giản (HTML only)
+ * - EmailUtils.java: Gửi email với hình ảnh inline (MimeMultipart)
+ * - Chức năng: EmailUtils mạnh hơn, hỗ trợ QR code, logo, banner trong email
+ * - Nên merge 2 class này thành 1 trong tương lai
+ * 
+ * SMTP CONFIGURATION:
+ * - Host: smtp.gmail.com
+ * - Port: 587 (STARTTLS)
+ * - Protocol: TLSv1.2
+ * - Auth: Username (email) + App Password
+ * 
+ * EMAIL CREDENTIALS:
+ * - EMAIL_FROM: evbatteryswap.system@gmail.com
+ * - EMAIL_PASSWORD: mzqbrzycduxhvbnr (App Password)
+ * - LƯU Ý: Giống EmailService.java, nên tạo config chung
+ * 
+ * METHODS:
+ * 
+ * 1. sendEmailWithImage(to, subject, htmlBody, imageBytes, imageContentId):
+ *    MỤC ĐÍCH:
+ *    - Gửi email HTML với hình ảnh inline (embedded)
+ *    - Hình ảnh hiển thị ngay trong email, không cần download
+ *    - Dùng cho QR code vé, logo company, banner sự kiện
+ *    
+ *    THAM SỐ:
+ *    - to: Email người nhận
+ *    - subject: Tiêu đề email
+ *    - htmlBody: Nội dung HTML (chứa <img src="cid:imageContentId">)
+ *    - imageBytes: Byte array của hình ảnh (PNG, JPG...)
+ *    - imageContentId: ID để reference trong HTML (ví dụ: "qrcode")
+ *    
+ *    VÍ DỤ:
+ *    String html = "<img src='cid:qrcode' />";
+ *    byte[] qrBytes = QRCodeGenerator.generate(data);
+ *    EmailUtils.sendEmailWithImage(email, "Your QR Code", html, qrBytes, "qrcode");
+ *    
+ *    KỸ THUẬT:
+ *    - MimeMultipart "related": Liên kết HTML và image
+ *    - Part 1: HTML content
+ *    - Part 2: Image với Content-ID header
+ *    - HTML reference image qua <img src="cid:xxx">
+ * 
+ * 2. sendRegistrationOtpEmail(toEmail, otp):
+ *    - Duplicate của EmailService.sendRegistrationOtpEmail()
+ *    - Giữ lại để tương thích với code hiện tại
+ *    - Nên xóa và dùng EmailService thay thế
+ * 
+ * 3. sendCustomEmail(toEmail, subject, htmlContent):
+ *    - Gửi email HTML tùy chỉnh (không có hình inline)
+ *    - Dùng cho thông báo, reset password, xác nhận đăng ký...
+ *    - Giống EmailService.sendCustomEmail()
+ * 
+ * 4. generateOtp():
+ *    - Sinh mã OTP 6 chữ số ngẫu nhiên (100000 - 999999)
+ *    - Duplicate của EmailService.generateOtp()
+ *    - Nên tạo Util chung cho OTP generation
+ * 
+ * 5. createSession():
+ *    - Tạo SMTP session với Gmail
+ *    - Config authentication và STARTTLS
+ *    - Private helper method
+ * 
+ * MIME MULTIPART:
+ * - MimeMultipart "related": Chứa HTML + inline resources
+ * - MimeBodyPart: Mỗi part là 1 phần của email (HTML, image, attachment)
+ * - Content-ID: Định danh hình ảnh trong HTML (<img src="cid:xxx">)
+ * - DataHandler + ByteArrayDataSource: Convert byte[] thành MIME content
+ * 
+ * UỢC ĐIỂM:
+ * - Hình ảnh hiển thị ngay, không bị blocked bởi email client
+ * - Không phụ thuộc external URL (image hosting)
+ * - Tốt cho QR code, logo, signature
+ * 
+ * NHƯỢC ĐIỂM:
+ * - Tăng kích thước email (image embedded trong email)
+ * - Không cache được (mỗi email chứa 1 copy image)
+ * - Một số email client cũ có thể không hiển thị
+ * 
+ * USE CASES:
+ * - Gửi QR code vé sự kiện trong email
+ * - Gửi logo company trong email signature
+ * - Gửi banner sự kiện trong email thông báo
+ * - Gửi chart/graph trong báo cáo
+ * 
+ * REFACTOR ĐỀ XUẤT:
+ * - Merge EmailService.java và EmailUtils.java thành 1 class
+ * - Tạo EmailConfig.java cho SMTP credentials
+ * - Tạo OtpUtils.java cho generateOtp()
+ * - Tạo EmailTemplateService.java cho HTML templates
+ * 
+ * SỬ DỤNG:
+ * - Controller: TicketController (gửi QR code vé)
+ * - Service: NotificationService (gửi thông báo với logo)
+ * - Controller: RegisterSendOtpController (OTP đăng ký)
+ */
+
 import java.util.Properties;
 
 import javax.activation.DataHandler;
@@ -23,7 +132,8 @@ public class EmailUtils {
     private static final String EMAIL_FROM = "evbatteryswap.system@gmail.com"; // project email
     private static final String EMAIL_PASSWORD = "mzqbrzycduxhvbnr"; // App Password - keep in sync with EmailService
 
-    public static void sendEmailWithImage(String to, String subject, String htmlBody, byte[] imageBytes, String imageContentId) throws Exception {
+    public static void sendEmailWithImage(String to, String subject, String htmlBody, byte[] imageBytes,
+            String imageContentId) throws Exception {
         Session session = createSession();
 
         MimeMessage message = new MimeMessage(session);
@@ -55,7 +165,8 @@ public class EmailUtils {
         System.out.println("[EmailUtils] ✅ Email sent to: " + to + " (subject='" + subject + "')");
     }
 
-    // ================== 1) GỬI EMAIL OTP ĐĂNG KÝ (giữ lại để tương thích với code hiện có)
+    // ================== 1) GỬI EMAIL OTP ĐĂNG KÝ (giữ lại để tương thích với code
+    // hiện có)
     public static boolean sendRegistrationOtpEmail(String toEmail, String otp) {
         try {
             Session session = createSession();

@@ -238,4 +238,116 @@ public class EventDAO {
         return e;
     }
 
+    /**
+     * "Xóa mềm" = vô hiệu hóa Event và các bảng liên quan: - Event.status =
+     * 'CLOSED' - Category_Ticket.status = 'INACTIVE' - Event_Seat_Layout.status
+     * = 'INAVAILABLE'
+     *
+     * Điều kiện: Event chưa có vé mua (Ticket tồn tại và status != 'CANCELLED'
+     * => KHÔNG cho disable)
+     *
+     * @param eventId
+     * @return true nếu disable thành công, false nếu event không tồn tại
+     * @throws java.sql.SQLException
+     * @throws java.lang.ClassNotFoundException
+     */
+    public boolean disableEventIfNoTickets(int eventId) throws SQLException, ClassNotFoundException {
+        Connection conn = null;
+
+        // (A) Lock event để tránh race-condition
+        String sqlCheckEvent
+                = "SELECT 1 "
+                + "FROM [FPTEventManagement].[dbo].[Event] WITH (UPDLOCK, HOLDLOCK) "
+                + "WHERE event_id = ?";
+
+        // (B) Check đã có vé mua chưa
+        String sqlCheckTickets
+                = "SELECT TOP 1 1 "
+                + "FROM [FPTEventManagement].[dbo].[Ticket] "
+                + "WHERE event_id = ? "
+                + "  AND status NOT IN ('CANCELLED')";
+
+        // (C) Disable Event
+        String sqlCloseEvent
+                = "UPDATE [FPTEventManagement].[dbo].[Event] "
+                + "SET status = 'CLOSED' "
+                + "WHERE event_id = ?";
+
+        // (D) Disable Category_Ticket
+        String sqlInactiveCategoryTicket
+                = "UPDATE [FPTEventManagement].[dbo].[Category_Ticket] "
+                + "SET status = 'INACTIVE' "
+                + "WHERE event_id = ? AND status <> 'INACTIVE'";
+
+        // (E) Disable Seat layout
+        String sqlInavailableSeats
+                = "UPDATE [FPTEventManagement].[dbo].[Event_Seat_Layout] "
+                + "SET status = 'INAVAILABLE' "
+                + "WHERE event_id = ? AND status <> 'INAVAILABLE'";
+
+        try {
+            conn = DBUtils.getConnection();
+            conn.setAutoCommit(false);
+
+            // 1) Check event tồn tại
+            try ( PreparedStatement ps = conn.prepareStatement(sqlCheckEvent)) {
+                ps.setInt(1, eventId);
+                try ( ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        conn.rollback();
+                        return false; // không có event
+                    }
+                }
+            }
+
+            // 2) Check đã có vé mua chưa
+            try ( PreparedStatement ps = conn.prepareStatement(sqlCheckTickets)) {
+                ps.setInt(1, eventId);
+                try ( ResultSet rs = ps.executeQuery()) {
+                    if (rs.next()) {
+                        conn.rollback();
+                        throw new SQLException("Không thể vô hiệu hóa: Event đã có vé được mua.");
+                    }
+                }
+            }
+
+            // 3) Update Event -> CLOSED
+            try ( PreparedStatement ps = conn.prepareStatement(sqlCloseEvent)) {
+                ps.setInt(1, eventId);
+                ps.executeUpdate();
+            }
+
+            // 4) Category_Ticket -> INACTIVE
+            try ( PreparedStatement ps = conn.prepareStatement(sqlInactiveCategoryTicket)) {
+                ps.setInt(1, eventId);
+                ps.executeUpdate();
+            }
+
+            // 5) Event_Seat_Layout -> INAVAILABLE
+            try ( PreparedStatement ps = conn.prepareStatement(sqlInavailableSeats)) {
+                ps.setInt(1, eventId);
+                ps.executeUpdate();
+            }
+
+            conn.commit();
+            return true;
+
+        } catch (SQLException ex) {
+            if (conn != null) {
+                conn.rollback();
+            }
+            throw ex;
+        } finally {
+            if (conn != null) {
+                try {
+                    conn.setAutoCommit(true);
+                } catch (SQLException ignore) {
+                }
+                try {
+                    conn.close();
+                } catch (SQLException ignore) {
+                }
+            }
+        }
+    }
 }

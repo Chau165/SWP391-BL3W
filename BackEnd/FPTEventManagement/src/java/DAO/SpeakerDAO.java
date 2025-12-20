@@ -12,14 +12,14 @@ import java.sql.Types;
 public class SpeakerDAO {
 
     /**
-     * Insert speaker mới, dùng connection đang mở (trong transaction).
-     * Trả về speaker_id vừa tạo, hoặc null nếu lỗi.
+     * Insert speaker mới, dùng connection đang mở (trong transaction). Trả về
+     * speaker_id vừa tạo, hoặc null nếu lỗi.
      */
     public Integer insertSpeaker(Connection conn, Speaker sp) throws SQLException {
         String sql = "INSERT INTO Speaker (full_name, bio, email, phone, avatar_url) "
-                   + "VALUES (?, ?, ?, ?, ?)";
+                + "VALUES (?, ?, ?, ?, ?)";
 
-        try (PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try ( PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             // full_name thường là NOT NULL
             ps.setNString(1, sp.getFullName());
@@ -55,7 +55,7 @@ public class SpeakerDAO {
             }
 
             // Lấy speaker_id vừa insert
-            try (ResultSet rs = ps.getGeneratedKeys()) {
+            try ( ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     return rs.getInt(1);
                 }
@@ -64,4 +64,18 @@ public class SpeakerDAO {
 
         return null;
     }
+
+    public void updateSpeaker(Connection conn, Speaker sp) throws SQLException {
+        String sql = "UPDATE Speaker SET full_name=?, bio=?, email=?, phone=?, avatar_url=? WHERE speaker_id=?";
+        try ( PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, sp.getFullName());
+            ps.setString(2, sp.getBio());
+            ps.setString(3, sp.getEmail());
+            ps.setString(4, sp.getPhone());
+            ps.setString(5, sp.getAvatarUrl());
+            ps.setInt(6, sp.getSpeakerId());
+            ps.executeUpdate();
+        }
+    }
+
 }

@@ -1,5 +1,109 @@
 package controller;
 
+/**
+ * ========================================================================================================
+ * CONTROLLER: loginController - ĐĂNG NHẬP VỚI reCAPTCHA
+ * ========================================================================================================
+ * 
+ * CHỨC NĂNG:
+ * - Đăng nhập user với email và mật khẩu
+ * - Xác thực reCAPTCHA (chống bot, spam login)
+ * - Kiểm tra thông tin login với database
+ * - Kiểm tra user status (BLOCKED không được login)
+ * - Sinh JWT token cho session
+ * - Trả về user info và token cho Frontend
+ * 
+ * ENDPOINT: POST /api/login
+ * 
+ * REQUEST BODY:
+ * {
+ *   "email": "a@fpt.edu.vn",
+ *   "password": "123456",
+ *   "recaptchaToken": "03AGdBq27..." // từ Google reCAPTCHA
+ * }
+ * 
+ * RESPONSE SUCCESS (200):
+ * {
+ *   "status": "success",
+ *   "message": "Đăng nhập thành công",
+ *   "user": {
+ *     "userId": 1,
+ *     "email": "a@fpt.edu.vn",
+ *     "fullName": "Nguyễn Văn A",
+ *     "role": "ORGANIZER",
+ *     "phone": "0901234567",
+ *     "status": "ACTIVE",
+ *     "avatar": "https://..."
+ *   },
+ *   "token": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+ * }
+ * 
+ * RESPONSE ERROR:
+ * - 400 Bad Request: Thiếu field, email không hợp lệ, reCAPTCHA token rỗng
+ * - 401 Unauthorized: Email/password sai, user bị BLOCKED
+ * - 403 Forbidden: reCAPTCHA verification failed
+ * - 500 Internal Server Error: Lỗi database, JWT generation
+ * 
+ * LUỒNG XỬ LÝ:
+ * 1. FE gửi POST request với email, password, recaptchaToken
+ * 2. Parse JSON request body
+ * 3. Validate các field không rỗng
+ * 4. Validate email format (ValidationUtil.isValidEmail)
+ * 5. Verify reCAPTCHA token với Google API (RecaptchaUtils.verify)
+ * 6. Nếu reCAPTCHA failed -> 403 Forbidden
+ * 7. Kiểm tra login credentials (UsersDAO.checkLogin)
+ * 8. Hash password và so sánh với database (SHA-256)
+ * 9. Nếu login failed -> 401 Unauthorized
+ * 10. Kiểm tra user status = "BLOCKED"
+ * 11. Nếu BLOCKED -> 401 Unauthorized
+ * 12. Sinh JWT token (JwtUtils.generateToken) với TTL 7 ngày
+ * 13. Trả về user info + token
+ * 14. FE lưu token vào localStorage/sessionStorage
+ * 
+ * reCAPTCHA FLOW:
+ * - Frontend: Load reCAPTCHA v2/v3 từ Google
+ * - User hoàn thành challenge (v2) hoặc invisible (v3)
+ * - FE nhận recaptchaToken từ Google
+ * - FE gửi recaptchaToken cùng email/password
+ * - Backend verify token với Google API
+ * - Google trả về success/fail + score (v3)
+ * 
+ * SECURITY:
+ * - reCAPTCHA: Chống bot, brute-force attack
+ * - Password hash: SHA-256 (nên nâng cấp lên BCrypt)
+ * - JWT token: 7 ngày expiration, signed với SECRET_KEY
+ * - User status check: Không cho BLOCKED user login
+ * - CORS whitelist: Chỉ cho phép origins đã config
+ * - Nên thêm rate limiting để chống brute-force
+ * 
+ * JWT TOKEN:
+ * - Algorithm: HS256 (HMAC with SHA-256)
+ * - Claims: userId, email, fullName, role
+ * - Expiration: 7 ngày (604800 seconds)
+ * - Signature: SECRET_KEY từ config
+ * - Header: "Authorization: Bearer <token>"
+ * 
+ * USER STATUS:
+ * - ACTIVE: Đăng nhập bình thường
+ * - BLOCKED: Không được đăng nhập (admin khóa)
+ * - PENDING: Chờ kích hoạt (OTP chưa verify)
+ * 
+ * LOGIN VS REGISTER:
+ * - Login: Xác thực user có sẵn trong DB
+ * - Register: Tạo user mới, gửi OTP verify
+ * - Cả 2 đều dùng reCAPTCHA
+ * - Login trả JWT token, Register trả temp token hoặc chờ verify
+ * 
+ * KẾT NỐI FILE:
+ * - DAO: DAO/UsersDAO.java (checkLogin, getUserByEmail)
+ * - DTO: DTO/Users.java (user object)
+ * - Utils: utils/RecaptchaUtils.java (verify reCAPTCHA)
+ * - Utils: utils/JwtUtils.java (generate JWT token)
+ * - Utils: utils/PasswordUtils.java (hash password trong DAO)
+ * - Utils: mylib/ValidationUtil.java (validate email)
+ * - Config: CORS whitelist trong web.xml hoặc filter
+ */
+
 import DAO.UsersDAO;
 import DTO.LoginRequest;
 import DTO.Users;

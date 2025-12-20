@@ -1,5 +1,55 @@
 package DTO;
 
+/**
+ * ========================================================================================================
+ * DTO: Users - ENTITY ĐẠI DIỆN CHO BẢNG USERS TRONG DATABASE
+ * ========================================================================================================
+ * 
+ * MỤC ĐÍCH:
+ * - Class này ánh xạ (mapping) với bảng Users trong SQL Server
+ * - Lưu trữ thông tin người dùng: sinh viên, admin, organizer
+ * - Sử dụng trong authentication, authorization, và quản lý user
+ * 
+ * CẤU TRÚC BẢNG DATABASE (Users):
+ * - user_id: INT IDENTITY PRIMARY KEY
+ * - full_name: NVARCHAR(100) NOT NULL
+ * - email: NVARCHAR(255) NOT NULL UNIQUE
+ * - phone: NVARCHAR(20) NOT NULL
+ * - password_hash: VARCHAR(64) NOT NULL (SHA-256 hash)
+ * - role: NVARCHAR(20) NOT NULL CHECK (role IN ('STUDENT', 'ADMIN', 'ORGANIZER'))
+ * - status: NVARCHAR(20) NOT NULL CHECK (status IN ('ACTIVE', 'INACTIVE', 'BANNED'))
+ * - created_at: DATETIME2 DEFAULT GETDATE()
+ * 
+ * ROLES:
+ * - STUDENT: Sinh viên - đăng ký sự kiện, xem vé
+ * - ADMIN: Quản trị viên - quản lý toàn bộ hệ thống
+ * - ORGANIZER: Người tổ chức - tạo và quản lý sự kiện
+ * 
+ * STATUS:
+ * - ACTIVE: Tài khoản hoạt động bình thường
+ * - INACTIVE: Tài khoản bị vô hiệu hóa tạm thời
+ * - BANNED: Tài khoản bị cấm vĩnh viễn
+ * 
+ * PASSWORD:
+ * - KHÔNG BAO GIỜ lưu plain password
+ * - Luôn hash bằng SHA-256 trước khi lưu DB
+ * - Field passwordHash chứa hash 64 ký tự hex
+ * - Verify: hash(input) == passwordHash
+ * 
+ * LUỒNG DỮ LIỆU:
+ * 1. User đăng ký: RegisterVerifyOtpController tạo Users object
+ * 2. Hash password: PasswordUtils.hashPassword(plainPassword)
+ * 3. Set default: role="STUDENT", status="ACTIVE"
+ * 4. Insert DB: UsersDAO.insertUser(users)
+ * 5. Sinh JWT: JwtUtils.generateToken(email, role, id)
+ * 6. Login: UsersDAO.checkLogin(email, password)
+ * 
+ * SỬ DỤNG:
+ * - DAO: DAO/UsersDAO.java (CRUD operations)
+ * - Controller: LoginController, RegisterController, ProfileController
+ * - Auth: JWT authentication, role-based access control
+ */
+
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.Date;
@@ -21,7 +71,7 @@ public class Users {
     }
 
     public Users(int id, String fullName, String email, String phone, String passwordHash,
-                 String role, String status, LocalDateTime createdAt) {
+            String role, String status, LocalDateTime createdAt) {
         this.id = id;
         this.fullName = fullName;
         this.email = email;
