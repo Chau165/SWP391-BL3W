@@ -48,15 +48,7 @@
         <url-pattern>/api/secure/my-package-history</url-pattern>
     </servlet-mapping>
 
-    <servlet>
-        <servlet-name>UpdatePackageController</servlet-name>
-        <servlet-class>controller.UpdatePackageController</servlet-class>
-        <load-on-startup>1</load-on-startup>
-    </servlet>
-    <servlet-mapping>
-        <servlet-name>UpdatePackageController</servlet-name>
-        <url-pattern>/api/secure/updatePackage</url-pattern>
-    </servlet-mapping>
+    <!-- UpdatePackageController removed (no implementation present) -->
 
     <!-- ========== (MỚI) RemoveBatteryController ========== -->
     <servlet>
