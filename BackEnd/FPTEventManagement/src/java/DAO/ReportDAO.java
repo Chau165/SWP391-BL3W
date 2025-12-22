@@ -44,8 +44,9 @@ public class ReportDAO {
     }
 
     public int insertReport(Report r) {
-        String sql = "INSERT INTO Report(user_id, ticket_id, title, description, image_url, status) "
-                + "VALUES (?, ?, ?, ?, ?, N'PENDING')";
+        String sql
+                = "INSERT INTO Report(user_id, ticket_id, title, description, image_url, status, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, N'PENDING', ?)";
 
         try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
@@ -55,11 +56,15 @@ public class ReportDAO {
             ps.setNString(4, r.getDescription());
             ps.setNString(5, r.getImageUrl());
 
+            // ✅ Set thời gian Việt Nam
+            java.time.ZonedDateTime vnNow = java.time.ZonedDateTime.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+            ps.setTimestamp(6, java.sql.Timestamp.valueOf(vnNow.toLocalDateTime()));
+
             ps.executeUpdate();
 
             try ( ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
-                    return rs.getInt(1); // report_id
+                    return rs.getInt(1);
                 }
             }
 
@@ -229,11 +234,12 @@ public class ReportDAO {
     /**
      * STAFF xử lý report: - approve=true => APPROVED + refund +
      * Ticket.status=REFUND - approve=false => REJECTED (no refund)
+     *
      * @param reportId
      * @param staffId
      * @param approve
      * @param staffNote
-     * @return 
+     * @return
      */
     public ProcessResult processReport(int reportId, int staffId, boolean approve, String staffNote) {
         ProcessResult result = new ProcessResult();
@@ -395,4 +401,3 @@ public class ReportDAO {
         }
     }
 }
-

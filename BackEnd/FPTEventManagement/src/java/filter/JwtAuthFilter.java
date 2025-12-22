@@ -101,6 +101,11 @@ public class JwtAuthFilter implements Filter {
             return true;
         }
 
+        // ====== 🔓 WALLET PAY – BỎ QUA JWT (tạm thời) ======
+        if (path.equals("/api/wallet/pay-ticket")) {
+            return true;
+        }
+
         // Swagger & OpenAPI
         if (path.equals("/api/openapi.json")) {
             return true;

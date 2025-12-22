@@ -7,34 +7,34 @@ import java.util.List;
 import mylib.DBUtils;
 
 public class BillDAO {
-    
+
     /**
-     * Insert Bill và trả về bill_id vừa tạo
-     * ✅ ĐÃ BỎ event_id - Bill chỉ liên kết với User
+     * Insert Bill và trả về bill_id vừa tạo ✅ ĐÃ BỎ event_id - Bill chỉ liên
+     * kết với User
+     *
      * @param bill
-     * @return 
+     * @return
      */
     public int insertBillAndReturnId(Bill bill) {
-        String sql = "INSERT INTO Bill (user_id, total_amount, currency, " +
-                     "payment_method, payment_status, created_at) " +
-                     "VALUES (?, ?, ?, ?, ?, ?)";
-        
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
-            
+        String sql = "INSERT INTO Bill (user_id, total_amount, currency, "
+                + "payment_method, payment_status, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?)";
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
             ps.setInt(1, bill.getUserId());
             ps.setBigDecimal(2, bill.getTotalAmount());
             ps.setString(3, bill.getCurrency());
             ps.setString(4, bill.getPaymentMethod());
             ps.setString(5, bill.getPaymentStatus());
             ps.setTimestamp(6, bill.getCreatedAt());
-            
+
             int affected = ps.executeUpdate();
             if (affected == 0) {
                 return -1;
             }
-            
-            try (ResultSet rs = ps.getGeneratedKeys()) {
+
+            try ( ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
                     return rs.getInt(1); // bill_id
                 }
@@ -45,21 +45,21 @@ public class BillDAO {
         }
         return -1;
     }
-    
+
     /**
      * Lấy Bill theo ID
+     *
      * @param billId
-     * @return 
+     * @return
      */
     public Bill getBillById(int billId) {
         String sql = "SELECT * FROM Bill WHERE bill_id = ?";
-        
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
             ps.setInt(1, billId);
             ResultSet rs = ps.executeQuery();
-            
+
             if (rs.next()) {
                 return mapResultSetToBill(rs);
             }
@@ -69,11 +69,12 @@ public class BillDAO {
         }
         return null;
     }
-    
+
     /**
      * Lấy tất cả Bill của 1 User
+     *
      * @param userId
-     * @return 
+     * @return
      */
     public List<DTO.BillResponse> getBillsByUserId(int userId) {
         String sql = "SELECT b.bill_id, b.total_amount, b.currency, b.payment_method, b.payment_status, b.created_at, u.full_name "
@@ -82,8 +83,7 @@ public class BillDAO {
 
         List<DTO.BillResponse> bills = new ArrayList<>();
 
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setInt(1, userId);
             ResultSet rs = ps.executeQuery();
@@ -105,22 +105,22 @@ public class BillDAO {
         }
         return bills;
     }
-    
+
     /**
      * Update payment status của Bill
+     *
      * @param billId
      * @param newStatus
-     * @return 
+     * @return
      */
     public boolean updatePaymentStatus(int billId, String newStatus) {
         String sql = "UPDATE Bill SET payment_status = ? WHERE bill_id = ?";
-        
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
-            
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
             ps.setString(1, newStatus);
             ps.setInt(2, billId);
-            
+
             return ps.executeUpdate() > 0;
         } catch (Exception e) {
             System.err.println("[ERROR] updatePaymentStatus: " + e.getMessage());
@@ -128,7 +128,41 @@ public class BillDAO {
         }
         return false;
     }
-    
+
+// DAO/BillDAO.java (thêm overload)
+    public int insertBillAndReturnId(Connection conn, Bill bill) throws SQLException {
+        String sql = "INSERT INTO Bill (user_id, total_amount, currency, payment_method, payment_status, created_at) "
+                + "VALUES (?, ?, ?, ?, ?, ?)";
+
+        try ( PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+
+            ps.setInt(1, bill.getUserId());
+            ps.setBigDecimal(2, bill.getTotalAmount());
+            ps.setString(3, bill.getCurrency());
+            ps.setString(4, bill.getPaymentMethod());
+            ps.setString(5, bill.getPaymentStatus());
+
+            Timestamp created = bill.getCreatedAt();
+            if (created != null) {
+                ps.setTimestamp(6, created);
+            } else {
+                ps.setTimestamp(6, new Timestamp(System.currentTimeMillis()));
+            }
+
+            int affected = ps.executeUpdate(); // ✅ INSERT phải dùng executeUpdate
+            if (affected == 0) {
+                return -1;
+            }
+
+            try ( ResultSet rs = ps.getGeneratedKeys()) { // ✅ lấy IDENTITY mới tạo
+                if (rs.next()) {
+                    return rs.getInt(1);
+                }
+            }
+            return -1;
+        }
+    }
+
     // Helper method
     private Bill mapResultSetToBill(ResultSet rs) throws SQLException {
         Bill bill = new Bill();

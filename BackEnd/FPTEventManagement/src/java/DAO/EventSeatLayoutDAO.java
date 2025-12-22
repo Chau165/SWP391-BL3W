@@ -120,7 +120,7 @@ public class EventSeatLayoutDAO {
                 + "           SELECT 1 FROM Ticket t "
                 + "           WHERE t.event_id = esl.event_id "
                 + "             AND t.seat_id = esl.seat_id "
-                + "           AND t.status IN ('BOOKED','CHECKED_IN','CHECKED_OUT', 'REFUND') "
+                + "           AND t.status IN ('BOOKED','CHECKED_IN','CHECKED_OUT', 'REFUNDED') "
                 + "       ) THEN 'BOOKED' "
                 + // ✅ đã mua / checkin
                 "       WHEN EXISTS ( "
