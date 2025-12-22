@@ -4,44 +4,35 @@ package DAO;
  * ========================================================================================================
  * DAO: UsersDAO - DATA ACCESS OBJECT CHO BẢNG USERS
  * ========================================================================================================
- * 
- * CHỨC NĂNG CHÍNH:
- * - Thực hiện các thao tác CRUD với bảng Users
- * - Authenticate: checkLogin() - xác thực email + password
- * - Query: findById(), getUserByEmail(), existsByEmail()
- * - Create: insertUser() - tạo tài khoản mới
+ *
+ * CHỨC NĂNG CHÍNH: - Thực hiện các thao tác CRUD với bảng Users - Authenticate:
+ * checkLogin() - xác thực email + password - Query: findById(),
+ * getUserByEmail(), existsByEmail() - Create: insertUser() - tạo tài khoản mới
  * - Update: updatePasswordByEmail() - đổi mật khẩu
- * 
- * DATABASE CONNECTION:
- * - Kết nối SQL Server qua mylib.DBUtils.getConnection()
- * - Sử dụng PreparedStatement để tránh SQL Injection
- * - Auto-close resources với try-with-resources
- * 
- * PASSWORD HANDLING:
- * - KHÔNG BAO GIỜ lưu plain password vào database
- * - Hash password bằng PasswordUtils.hashPassword() (SHA-256)
- * - Verify password bằng PasswordUtils.verifyPassword()
- * 
- * METHODS:
- * 1. checkLogin(email, password): Xác thực login, trả về Users nếu đúng
- * 2. findById(id): Tìm user theo user_id
- * 3. existsByEmail(email): Kiểm tra email đã tồn tại chưa
- * 4. insertUser(user): Tạo user mới, trả về user_id
- * 5. updatePasswordByEmail(email, password): Đổi mật khẩu
- * 6. getUserByEmail(email): Lấy thông tin user theo email
- * 7. mapRowToUser(rs): Helper map ResultSet -> Users object
- * 
- * SECURITY:
- * - Password luôn được hash SHA-256 trước khi lưu
- * - checkLogin() verify hash thay vì so sánh plain text
- * - Nên thêm thêm salt để tăng bảo mật (hiện tại chưa có)
- * 
- * SỬ DỤNG:
- * - Controller: LoginController, RegisterVerifyOtpController, ProfileController
- * - Utils: PasswordUtils (hash/verify password)
- * - Config: mylib/DBUtils (database connection)
+ *
+ * DATABASE CONNECTION: - Kết nối SQL Server qua mylib.DBUtils.getConnection() -
+ * Sử dụng PreparedStatement để tránh SQL Injection - Auto-close resources với
+ * try-with-resources
+ *
+ * PASSWORD HANDLING: - KHÔNG BAO GIỜ lưu plain password vào database - Hash
+ * password bằng PasswordUtils.hashPassword() (SHA-256) - Verify password bằng
+ * PasswordUtils.verifyPassword()
+ *
+ * METHODS: 1. checkLogin(email, password): Xác thực login, trả về Users nếu
+ * đúng 2. findById(id): Tìm user theo user_id 3. existsByEmail(email): Kiểm tra
+ * email đã tồn tại chưa 4. insertUser(user): Tạo user mới, trả về user_id 5.
+ * updatePasswordByEmail(email, password): Đổi mật khẩu 6.
+ * getUserByEmail(email): Lấy thông tin user theo email 7. mapRowToUser(rs):
+ * Helper map ResultSet -> Users object
+ *
+ * SECURITY: - Password luôn được hash SHA-256 trước khi lưu - checkLogin()
+ * verify hash thay vì so sánh plain text - Nên thêm thêm salt để tăng bảo mật
+ * (hiện tại chưa có)
+ *
+ * SỬ DỤNG: - Controller: LoginController, RegisterVerifyOtpController,
+ * ProfileController - Utils: PasswordUtils (hash/verify password) - Config:
+ * mylib/DBUtils (database connection)
  */
-
 import DTO.Users;
 import mylib.DBUtils;
 import utils.PasswordUtils;
@@ -51,6 +42,7 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.math.BigDecimal;
 
 public class UsersDAO {
 
@@ -58,14 +50,13 @@ public class UsersDAO {
         if (email == null || rawPassword == null) {
             return null;
         }
-
-        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, created_at "
+        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, Wallet, created_at "
                 + "FROM Users WHERE email = ?";
 
-        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, email);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     String dbHash = rs.getString("password_hash");
 
@@ -75,17 +66,18 @@ public class UsersDAO {
                         return null; // sai mật khẩu
                     }
 
-                    // ✅ Tạo đối tượng Users nếu login đúng
                     Users user = new Users();
                     user.setId(rs.getInt("user_id"));
                     user.setFullName(rs.getString("full_name"));
                     user.setEmail(rs.getString("email"));
                     user.setPhone(rs.getString("phone"));
-                    user.setPasswordHash(dbHash); // nếu DTO có field này
+                    user.setPasswordHash(dbHash);
                     user.setRole(rs.getString("role"));
                     user.setStatus(rs.getString("status"));
+                    user.setWallet(rs.getBigDecimal("Wallet"));
                     user.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
                     return user;
+
                 } else {
                     // Không tìm thấy email
                     return null;
@@ -102,14 +94,14 @@ public class UsersDAO {
     // TÌM USER THEO ID
     // =========================
     public Users findById(int id) {
-        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, created_at "
+        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, Wallet, created_at "
                 + "FROM Users WHERE user_id = ?";
 
-        try (Connection con = DBUtils.getConnection(); PreparedStatement ps = con.prepareStatement(sql)) {
+        try ( Connection con = DBUtils.getConnection();  PreparedStatement ps = con.prepareStatement(sql)) {
 
             ps.setInt(1, id);
 
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     return mapRowToUser(rs);
                 }
@@ -127,10 +119,10 @@ public class UsersDAO {
     public boolean existsByEmail(String email) {
         String sql = "SELECT user_id FROM Users WHERE email = ?";
 
-        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setNString(1, email); // email là NVARCHAR
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
         } catch (Exception e) {
@@ -152,17 +144,14 @@ public class UsersDAO {
      * @return
      */
     public int insertUser(Users u) {
-        String sql = "INSERT INTO Users(full_name, email, phone, password_hash, role, status) "
-                + "VALUES (?, ?, ?, ?, ?, ?)";
+        String sql = "INSERT INTO Users(full_name, email, phone, password_hash, role, status, Wallet) "
+                + "VALUES (?, ?, ?, ?, ?, ?, ?)";
 
-        try (Connection conn = DBUtils.getConnection();
-                PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql, Statement.RETURN_GENERATED_KEYS)) {
 
             ps.setNString(1, u.getFullName());
             ps.setNString(2, u.getEmail());
             ps.setNString(3, u.getPhone());
-
-            // password_hash: phải là hash SHA-256
             ps.setString(4, u.getPasswordHash());
 
             String role = isBlank(u.getRole()) ? "STUDENT" : u.getRole();
@@ -171,11 +160,14 @@ public class UsersDAO {
             ps.setNString(5, role);
             ps.setNString(6, status);
 
+            BigDecimal wallet = (u.getWallet() == null) ? BigDecimal.ZERO : u.getWallet();
+            ps.setBigDecimal(7, wallet);
+
             ps.executeUpdate();
 
-            try (ResultSet rs = ps.getGeneratedKeys()) {
+            try ( ResultSet rs = ps.getGeneratedKeys()) {
                 if (rs.next()) {
-                    return rs.getInt(1); // user_id mới
+                    return rs.getInt(1);
                 }
             }
 
@@ -189,7 +181,7 @@ public class UsersDAO {
     /**
      * Cập nhật mật khẩu (hash) theo email.
      *
-     * @param email       email user
+     * @param email email user
      * @param rawPassword mật khẩu mới dạng plain-text
      * @return
      */
@@ -200,7 +192,7 @@ public class UsersDAO {
 
         String sql = "UPDATE Users SET password_hash = ? WHERE email = ?";
 
-        try (Connection conn = DBUtils.getConnection(); PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             String hash = PasswordUtils.hashPassword(rawPassword);
             ps.setString(1, hash);
@@ -219,15 +211,14 @@ public class UsersDAO {
     public Users getUserByEmail(String email) {
         Users user = null;
 
-        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, created_at "
+        String sql = "SELECT user_id, full_name, email, phone, password_hash, role, status, Wallet, created_at "
                 + "FROM Users WHERE email = ?";
 
-        try (Connection conn = DBUtils.getConnection();
-                PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setNString(1, email); // Email là NVARCHAR
 
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 if (rs.next()) {
                     user = new Users();
                     user.setId(rs.getInt("user_id"));
@@ -237,6 +228,7 @@ public class UsersDAO {
                     user.setPasswordHash(rs.getString("password_hash"));
                     user.setRole(rs.getString("role"));
                     user.setStatus(rs.getString("status"));
+                    user.setWallet(rs.getBigDecimal("Wallet"));
                     user.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
                 }
             }
@@ -261,6 +253,7 @@ public class UsersDAO {
         u.setPasswordHash(rs.getString("password_hash"));
         u.setRole(rs.getNString("role"));
         u.setStatus(rs.getNString("status"));
+        u.setWallet(rs.getBigDecimal("Wallet"));
         u.setCreatedAt(rs.getTimestamp("created_at").toLocalDateTime());
         return u;
     }

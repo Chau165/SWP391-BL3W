@@ -154,6 +154,7 @@ public class UpdateEventDetailsController extends HttpServlet {
             }
 
             // Rule: nếu event đang OPEN => không cho đổi quantity
+            //Biết đâu là event đầu để mở event đâu là update những lần sau
             boolean lockQuantity = "OPEN".equalsIgnoreCase(event.getStatus());
 
             // ======================= (7) TRANSACTION =======================

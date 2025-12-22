@@ -45,45 +45,38 @@ public class StaffCheckoutController extends HttpServlet {
     /**
      * ======================= STATUS CODE TRẢ VỀ =======================
      *
-     * ✅ OPTIONS:
-     * - 200 OK: browser gọi preflight CORS
+     * ✅ OPTIONS: - 200 OK: browser gọi preflight CORS
      *
-     * ✅ POST (API chính):
-     * - 200 OK:
-     *     + Khi xử lý thành công TẤT CẢ vé trong QR (failCount == 0)
+     * ✅ POST (API chính): - 200 OK: + Khi xử lý thành công TẤT CẢ vé trong QR
+     * (failCount == 0)
      *
-     * - 400 BAD_REQUEST:
-     *     + Không có ticketCode/ticketId (thiếu param)
-     *     + QR không parse được ticketId (NumberFormatException)
-     *     + ticketIds rỗng sau khi parse
-     *     + Với QR nhiều vé: chỉ cần có 1 vé fail => cuối cùng isSuccess=false => trả 400
-     *       (vì bạn set: resp.setStatus(isSuccess ? 200 : 400))
+     * - 400 BAD_REQUEST: + Không có ticketCode/ticketId (thiếu param) + QR
+     * không parse được ticketId (NumberFormatException) + ticketIds rỗng sau
+     * khi parse + Với QR nhiều vé: chỉ cần có 1 vé fail => cuối cùng
+     * isSuccess=false => trả 400 (vì bạn set: resp.setStatus(isSuccess ? 200 :
+     * 400))
      *
-     * - 401 UNAUTHORIZED:
-     *     + Thiếu token (Authorization header)
-     *     + Token không hợp lệ / hết hạn
+     * - 401 UNAUTHORIZED: + Thiếu token (Authorization header) + Token không
+     * hợp lệ / hết hạn
      *
-     * - 403 FORBIDDEN:
-     *     + Role không phải ORGANIZER hoặc ADMIN
+     * - 403 FORBIDDEN: + Role không phải ORGANIZER hoặc ADMIN
      *
-     * ❗ LƯU Ý QUAN TRỌNG (để trả lời thầy/cô):
-     * - Trong vòng lặp, có nhiều lỗi thuộc dạng "NOT FOUND" (ticket/event null),
-     *   nhưng bạn KHÔNG trả 404 ở mức HTTP, mà đưa lỗi vào results[].
-     *   HTTP cuối cùng vẫn phụ thuộc isSuccess (200 hoặc 400).
-     * - Không có 500 trong code hiện tại vì không catch lỗi DB/Runtime ngoài loop.
-     *   Nếu TicketDAO/EventDAO ném Exception => servlet có thể crash hoặc container trả 500 mặc định.
+     * ❗ LƯU Ý QUAN TRỌNG (để trả lời thầy/cô): - Trong vòng lặp, có nhiều lỗi
+     * thuộc dạng "NOT FOUND" (ticket/event null), nhưng bạn KHÔNG trả 404 ở mức
+     * HTTP, mà đưa lỗi vào results[]. HTTP cuối cùng vẫn phụ thuộc isSuccess
+     * (200 hoặc 400). - Không có 500 trong code hiện tại vì không catch lỗi
+     * DB/Runtime ngoài loop. Nếu TicketDAO/EventDAO ném Exception => servlet có
+     * thể crash hoặc container trả 500 mặc định.
      */
-
     // ===================== CORS (copy y hệt checkin) =====================
     /**
-     * setCorsHeaders:
-     * - Cho phép FE từ localhost/ngrok gọi API checkout (tránh CORS blocked)
-     * - Nếu origin nằm whitelist -> set Access-Control-Allow-Origin = origin
-     * - Nếu không -> set "null"
+     * setCorsHeaders: - Cho phép FE từ localhost/ngrok gọi API checkout (tránh
+     * CORS blocked) - Nếu origin nằm whitelist -> set
+     * Access-Control-Allow-Origin = origin - Nếu không -> set "null"
      *
-     * CÂU HỎI THẦY/CÔ:
-     * 1) "Tại sao phải có OPTIONS?" => Browser sẽ preflight khi gọi POST kèm Authorization header.
-     * 2) "Vì sao set Vary: Origin?" => để cache/proxy phân biệt response theo Origin.
+     * CÂU HỎI THẦY/CÔ: 1) "Tại sao phải có OPTIONS?" => Browser sẽ preflight
+     * khi gọi POST kèm Authorization header. 2) "Vì sao set Vary: Origin?" =>
+     * để cache/proxy phân biệt response theo Origin.
      */
     private void setCorsHeaders(HttpServletResponse res, HttpServletRequest req) {
         String origin = req.getHeader("Origin");
@@ -111,10 +104,7 @@ public class StaffCheckoutController extends HttpServlet {
     }
 
     /**
-     * doOptions:
-     * - Preflight request cho CORS.
-     * STATUS:
-     * - 200 OK
+     * doOptions: - Preflight request cho CORS. STATUS: - 200 OK
      */
     @Override
     protected void doOptions(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -125,28 +115,23 @@ public class StaffCheckoutController extends HttpServlet {
     /**
      * ===================== doPost: API CHECK-OUT =====================
      *
-     * TRANG FE gọi:
-     * - POST /api/staff/checkout?ticketCode=...   (hoặc ticketId=...)
+     * TRANG FE gọi: - POST /api/staff/checkout?ticketCode=... (hoặc
+     * ticketId=...)
      *
-     * FLOW TỔNG:
-     * 1) Check token (401 nếu thiếu/hỏng)
-     * 2) Check role (403 nếu không đúng)
-     * 3) Lấy qrValue (ticketCode hoặc ticketId) (400 nếu thiếu)
-     * 4) Parse ra list ticketIds (1 vé hoặc nhiều vé dạng "TICKETS:1,2,3") (400 nếu QR sai)
-     * 5) Load config minMinutesAfterStart từ file (rule cho phép checkout sau X phút)
-     * 6) Loop từng ticket:
-     *    - ticket tồn tại? event tồn tại?
-     *    - check rule thời gian (chưa đủ thời gian -> fail)
-     *    - check status hợp lệ (phải CHECKED_IN, chưa CHECKED_OUT)
-     *    - update checkout => OK/fail
-     * 7) Build response JSON: { success, message, totalTickets, successCount, failCount, results[] }
-     * 8) Set HTTP status cuối:
-     *    - success=true -> 200
-     *    - success=false -> 400
+     * FLOW TỔNG: 1) Check token (401 nếu thiếu/hỏng) 2) Check role (403 nếu
+     * không đúng) 3) Lấy qrValue (ticketCode hoặc ticketId) (400 nếu thiếu) 4)
+     * Parse ra list ticketIds (1 vé hoặc nhiều vé dạng "TICKETS:1,2,3") (400
+     * nếu QR sai) 5) Load config minMinutesAfterStart từ file (rule cho phép
+     * checkout sau X phút) 6) Loop từng ticket: - ticket tồn tại? event tồn
+     * tại? - check rule thời gian (chưa đủ thời gian -> fail) - check status
+     * hợp lệ (phải CHECKED_IN, chưa CHECKED_OUT) - update checkout => OK/fail
+     * 7) Build response JSON: { success, message, totalTickets, successCount,
+     * failCount, results[] } 8) Set HTTP status cuối: - success=true -> 200 -
+     * success=false -> 400
      *
-     * CÂU HỎI THẦY/CÔ:
-     * - "Tại sao trả 400 khi có 1 vé fail trong nhiều vé?" => vì bạn định nghĩa success là "tất cả phải OK".
-     *   (Có thể cải tiến: luôn 200 và xem successCount/failCount; hoặc dùng 207 Multi-Status.)
+     * CÂU HỎI THẦY/CÔ: - "Tại sao trả 400 khi có 1 vé fail trong nhiều vé?" =>
+     * vì bạn định nghĩa success là "tất cả phải OK". (Có thể cải tiến: luôn 200
+     * và xem successCount/failCount; hoặc dùng 207 Multi-Status.)
      */
     @Override
     protected void doPost(HttpServletRequest req, HttpServletResponse resp) throws IOException {
@@ -206,9 +191,8 @@ public class StaffCheckoutController extends HttpServlet {
 
         // ===================== 4) Parse danh sách ticketIds =====================
         /**
-         * QR có thể là:
-         * - "123" => 1 vé
-         * - "TICKETS:123,124,125" => nhiều vé gộp chung
+         * QR có thể là: - "123" => 1 vé - "TICKETS:123,124,125" => nhiều vé gộp
+         * chung
          */
         List<Integer> ticketIds = new ArrayList<>();
         try {
@@ -241,12 +225,12 @@ public class StaffCheckoutController extends HttpServlet {
 
         // ===================== 4.5) Load config runtime =====================
         /**
-         * Load config 1 lần cho request:
-         * - cfg.minMinutesAfterStart: số phút tối thiểu sau startTime mới được checkout
+         * Load config 1 lần cho request: - cfg.minMinutesAfterStart: số phút
+         * tối thiểu sau startTime mới được checkout
          *
-         * CÂU HỎI THẦY/CÔ:
-         * 1) "Tại sao phải đọc config runtime từ file?" => để admin cấu hình rule mà không sửa code.
-         * 2) "Đọc file ở đâu?" => trong WEB-INF/classes/config/SystemConfig.json qua ServletContext realPath.
+         * CÂU HỎI THẦY/CÔ: 1) "Tại sao phải đọc config runtime từ file?" => để
+         * admin cấu hình rule mà không sửa code. 2) "Đọc file ở đâu?" => trong
+         * WEB-INF/classes/config/SystemConfig.json qua ServletContext realPath.
          */
         SystemConfigService.SystemConfig cfg = systemConfigService.load(req.getServletContext());
         int minMinutesAfterStart = cfg.minMinutesAfterStart;
@@ -304,11 +288,11 @@ public class StaffCheckoutController extends HttpServlet {
             // Trả thêm eventName để FE hiển thị
             item.addProperty("eventName", event.getTitle());
 
-            // ===== RULE THỜI GIAN: checkout chỉ sau X phút từ startTime =====
+            // ===== RULE THỜI GIAN: checkout chỉ trong khung cho phép =====
             Timestamp eventStartTime = event.getStartTime();
             Timestamp eventEndTime = event.getEndTime();
 
-            // Nếu event thiếu start/end => không thể áp rule => fail
+// Nếu event thiếu start/end => không thể áp rule => fail
             if (eventStartTime == null || eventEndTime == null) {
                 item.addProperty("success", false);
                 item.addProperty("message", "Sự kiện không có thời gian hợp lệ để check-out");
@@ -317,24 +301,44 @@ public class StaffCheckoutController extends HttpServlet {
                 continue;
             }
 
-            // Thời điểm cho phép checkout = startTime + X phút
+// (1) Thời điểm cho phép checkout bắt đầu = startTime + X phút
             long allowCheckoutMs = eventStartTime.getTime() + (minMinutesAfterStart * 60L * 1000L);
             Timestamp allowCheckoutTime = new Timestamp(allowCheckoutMs);
 
-            // Nếu hiện tại chưa tới thời điểm cho phép => fail
+// (2) Thời điểm kết thúc checkout = endTime + 30 phút
+            int checkoutGraceMinutes = 30;
+            long checkoutDeadlineMs = eventEndTime.getTime() + (checkoutGraceMinutes * 60L * 1000L);
+            Timestamp checkoutDeadlineTime = new Timestamp(checkoutDeadlineMs);
+
+// Nếu hiện tại chưa tới thời điểm cho phép => fail
             if (now.before(allowCheckoutTime)) {
                 String allowStr = dateFormat.format(allowCheckoutTime);
                 item.addProperty("success", false);
                 item.addProperty("message",
                         "Chưa đủ thời gian để check-out. Có thể check-out từ: " + allowStr
-                                + " (cấu hình: " + minMinutesAfterStart + " phút sau khi bắt đầu)");
+                        + " (cấu hình: " + minMinutesAfterStart + " phút sau khi bắt đầu)");
                 item.addProperty("allowCheckoutTime", allowCheckoutTime.toString());
                 item.addProperty("minMinutesAfterStart", minMinutesAfterStart);
                 failCount++;
                 resultArray.add(item);
                 continue;
             }
-            // ===== END RULE =====
+
+// ✅ Nếu đã quá hạn checkout (end + 30 phút) => fail
+            if (now.after(checkoutDeadlineTime)) {
+                String deadlineStr = dateFormat.format(checkoutDeadlineTime);
+                item.addProperty("success", false);
+                item.addProperty("message",
+                        "Đã quá thời gian check-out. Hạn check-out đến: " + deadlineStr
+                        + " (Sự kiện kết thúc + " + checkoutGraceMinutes + " phút)");
+                item.addProperty("checkoutDeadlineTime", checkoutDeadlineTime.toString());
+                item.addProperty("checkoutGraceMinutes", checkoutGraceMinutes);
+                item.addProperty("eventEndTime", eventEndTime.toString());
+                failCount++;
+                resultArray.add(item);
+                continue;
+            }
+// ===== END RULE THỜI GIAN =====
 
             // 5.3) Check trạng thái vé
             String currentStatus = ticket.getStatus();
@@ -387,13 +391,11 @@ public class StaffCheckoutController extends HttpServlet {
         String mainMessage;
 
         /**
-         * Nếu quét 1 vé:
-         * - message chính = message của vé đó (đỡ phải format)
+         * Nếu quét 1 vé: - message chính = message của vé đó (đỡ phải format)
          *
-         * Nếu quét nhiều vé:
-         * - Nếu tất cả OK: "Check-out thành công X vé"
-         * - Nếu tất cả fail: "Check-out thất bại cho tất cả X vé"
-         * - Nếu 1 phần: "Check-out thành công a/b vé"
+         * Nếu quét nhiều vé: - Nếu tất cả OK: "Check-out thành công X vé" - Nếu
+         * tất cả fail: "Check-out thất bại cho tất cả X vé" - Nếu 1 phần:
+         * "Check-out thành công a/b vé"
          */
         if (ticketIds.size() == 1) {
             JsonObject result = resultArray.get(0).getAsJsonObject();
@@ -419,18 +421,16 @@ public class StaffCheckoutController extends HttpServlet {
         resJson.add("results", resultArray);
 
         /**
-         * STATUS HTTP cuối:
-         * - Nếu tất cả vé OK => 200
-         * - Nếu có bất kỳ vé fail => 400
+         * STATUS HTTP cuối: - Nếu tất cả vé OK => 200 - Nếu có bất kỳ vé fail
+         * => 400
          *
-         * CÂU HỎI THẦY/CÔ:
-         * 1) "Sao ticket không tồn tại không trả 404?" =>
-         *    Vì bạn đang xử lý batch nhiều vé, nên gói lỗi vào results[] để FE vẫn thấy từng vé fail gì.
-         * 2) "Có chuẩn REST không?" =>
-         *    Có thể cải tiến dùng 207 Multi-Status (WebDAV) hoặc luôn 200 và dựa successCount/failCount.
+         * CÂU HỎI THẦY/CÔ: 1) "Sao ticket không tồn tại không trả 404?" => Vì
+         * bạn đang xử lý batch nhiều vé, nên gói lỗi vào results[] để FE vẫn
+         * thấy từng vé fail gì. 2) "Có chuẩn REST không?" => Có thể cải tiến
+         * dùng 207 Multi-Status (WebDAV) hoặc luôn 200 và dựa
+         * successCount/failCount.
          */
         resp.setStatus(isSuccess ? HttpServletResponse.SC_OK : HttpServletResponse.SC_BAD_REQUEST); // 200 or 400
         resp.getWriter().write(gson.toJson(resJson));
     }
 }
-
