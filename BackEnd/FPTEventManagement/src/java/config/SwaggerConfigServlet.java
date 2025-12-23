@@ -1020,6 +1020,29 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}"
                 + "}";
 
+        // ===== API: /api/users/staff-organizer (Admin only) =====
+        String staffOrganizerPath
+                = "\"/api/users/staff-organizer\":{"
+                + "\"get\":{"
+                + "\"tags\":[\"Users\"],"
+                + "\"summary\":\"[Admin] Get STAFF & ORGANIZER users (2 lists)\","
+                + "\"description\":\"Chỉ ADMIN được phép gọi. Trả về 2 danh sách: staffList và organizerList.\","
+                + "\"security\":[{\"bearerAuth\":[]}],"
+                + "\"responses\":{"
+                + "  \"200\":{"
+                + "    \"description\":\"OK\","
+                + "    \"content\":{"
+                + "      \"application/json\":{"
+                + "        \"schema\":{\"$ref\":\"#/components/schemas/StaffOrganizerResponse\"}"
+                + "      }"
+                + "    }"
+                + "  },"
+                + "  \"401\":{\"description\":\"Unauthorized\"},"
+                + "  \"403\":{\"description\":\"Forbidden (Admin only)\"}"
+                + "}"
+                + "}"
+                + "}";
+
         // ================================
         // ========== GHÉP JSON ===========
         // ================================
@@ -1057,7 +1080,8 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + eventStatsPath + ","
                 + ticketListPath + ","
                 + adminCreatePath + ","
-                + myBillsPath
+                + myBillsPath + ","
+                + staffOrganizerPath
                 + "},"
                 + "\"components\":{"
                 + "\"securitySchemes\":{"
@@ -1471,6 +1495,33 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "\"totalRefunded\":{\"type\":\"integer\", \"description\":\"Số vé đã REFUNDED\"},"
                 + "\"refundedRate\":{\"type\":\"string\", \"example\":\"5.0%\"}"
                 + "}},"
+                // Schema: StaffOrganizerUser (không có createdAt)
+                + "\"StaffOrganizerUser\":{"
+                + "\"type\":\"object\","
+                + "\"properties\":{"
+                + "  \"id\":{\"type\":\"integer\"},"
+                + "  \"fullName\":{\"type\":\"string\"},"
+                + "  \"email\":{\"type\":\"string\"},"
+                + "  \"phone\":{\"type\":\"string\"},"
+                + "  \"role\":{\"type\":\"string\",\"enum\":[\"STAFF\",\"ORGANIZER\"]},"
+                + "  \"status\":{\"type\":\"string\"},"
+                + "  \"wallet\":{\"type\":\"number\"}"
+                + "}"
+                + "},"
+                // Schema: StaffOrganizerResponse
+                + "\"StaffOrganizerResponse\":{"
+                + "\"type\":\"object\","
+                + "\"properties\":{"
+                + "  \"staffList\":{"
+                + "    \"type\":\"array\","
+                + "    \"items\":{\"$ref\":\"#/components/schemas/StaffOrganizerUser\"}"
+                + "  },"
+                + "  \"organizerList\":{"
+                + "    \"type\":\"array\","
+                + "    \"items\":{\"$ref\":\"#/components/schemas/StaffOrganizerUser\"}"
+                + "  }"
+                + "}"
+                + "},"
                 // Schema: AdminCreateAccountController
                 + "\"AdminCreateAccountRequest\":{\"type\":\"object\",\"properties\":{"
                 + "\"fullName\":{\"type\":\"string\",\"example\":\"string\"},"
