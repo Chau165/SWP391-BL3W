@@ -493,17 +493,31 @@ public class TicketDAO {
      * lấy stats của sự kiện - Report: Xuất báo cáo sau sự kiện
      */
     // New: get event statistics (total tickets, checked-in count, check-in rate)
-    public EventStatsResponse getEventStats(int eventId) {
+    public EventStatsResponse getEventStatsByRole(String role, int userId, Integer eventId) {
         EventStatsResponse stats = new EventStatsResponse();
-        stats.setEventId(eventId);
+        // Nếu không truyền eventId cụ thể, mặc định trả về stats rỗng hoặc 0
+        stats.setEventId(eventId != null ? eventId : 0);
 
-        // SQL đếm số lượng theo từng status
-        String sql = "SELECT status, COUNT(*) as total FROM Ticket WHERE event_id = ? "
-                + "AND status IN ('BOOKED', 'CHECKED_IN', 'CHECKED_OUT', 'REFUNDED') GROUP BY status";
+        // SQL mới: JOIN với Event_Request để kiểm tra chủ sở hữu (requester_id)
+        String sql = "SELECT t.status, COUNT(*) as total "
+                + "FROM [dbo].[Ticket] t "
+                + "JOIN [dbo].[Event_Request] er ON t.event_id = er.created_event_id "
+                + "WHERE t.status IN ('BOOKED', 'CHECKED_IN', 'CHECKED_OUT', 'REFUNDED') "
+                + "AND t.event_id = ? "
+                + // Lọc đúng sự kiện cần xem
+                "AND (? = 'ADMIN' OR (? = 'ORGANIZER' AND er.requester_id = ?)) "
+                + // Chốt chặn bảo mật
+                "GROUP BY t.status";
 
         int booked = 0, checkedIn = 0, checkedOut = 0, refunded = 0;
+
         try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
-            ps.setInt(1, eventId);
+
+            ps.setInt(1, eventId != null ? eventId : -1);
+            ps.setString(2, role);
+            ps.setString(3, role);
+            ps.setInt(4, userId);
+
             try ( ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
                     String s = rs.getString("status");
@@ -523,6 +537,7 @@ public class TicketDAO {
             e.printStackTrace();
         }
 
+        // Logic tính toán phần trăm giữ nguyên
         int total = booked + checkedIn + checkedOut + refunded;
         stats.setTotalRegistered(total);
         stats.setTotalBooking(booked);
@@ -530,13 +545,28 @@ public class TicketDAO {
         stats.setTotalCheckedOut(checkedOut);
         stats.setTotalRefunded(refunded);
 
-        // Tính tỉ lệ phần trăm (Rate)
         stats.setBookingRate(total > 0 ? String.format("%.1f%%", (booked * 100.0) / total) : "0.0%");
         stats.setCheckInRate(total > 0 ? String.format("%.1f%%", (checkedIn * 100.0) / total) : "0.0%");
         stats.setCheckOutRate(total > 0 ? String.format("%.1f%%", (checkedOut * 100.0) / total) : "0.0%");
         stats.setRefundedRate(total > 0 ? String.format("%.1f%%", (refunded * 100.0) / total) : "0.0%");
 
         return stats;
+    }
+
+    // Thêm hàm này vào TicketDAO.java
+    public boolean checkEventExists(int eventId) {
+        String sql = "SELECT COUNT(*) FROM [dbo].[Event_Request] WHERE created_event_id = ?";
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, eventId);
+            try ( ResultSet rs = ps.executeQuery()) {
+                if (rs.next()) {
+                    return rs.getInt(1) > 0;
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     public List<MyTicketResponse> getTicketsByRole(String role, int userId, Integer eventId) {

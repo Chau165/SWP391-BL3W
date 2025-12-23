@@ -1,17 +1,14 @@
 package controller;
 
 import DAO.TicketDAO;
-import DTO.EventStatsResponse; // DTO mới có đủ trường booking/refunded
+import DTO.EventStatsResponse;
 import utils.JwtUtils;
-
 import com.google.gson.Gson;
-import com.google.gson.JsonObject;
+import jakarta.servlet.ServletException;
 import jakarta.servlet.annotation.WebServlet;
 import jakarta.servlet.http.*;
-
 import java.io.IOException;
-import java.time.LocalDate;
-import java.time.format.DateTimeParseException;
+import java.io.PrintWriter;
 
 @WebServlet("/api/events/stats")
 public class EventStatsController extends HttpServlet {
@@ -19,27 +16,15 @@ public class EventStatsController extends HttpServlet {
     private final TicketDAO ticketDAO = new TicketDAO();
     private final Gson gson = new Gson();
 
-    // Giữ nguyên logic CORS của bạn
     private void setCorsHeaders(HttpServletResponse res, HttpServletRequest req) {
         String origin = req.getHeader("Origin");
-        boolean allowed = origin != null && (origin.equals("http://localhost:5173")
-                || origin.equals("http://127.0.0.1:5173")
-                || origin.equals("http://localhost:3000")
-                || origin.equals("http://127.0.0.1:3000")
-                || origin.contains("ngrok-free.app")
-                || origin.contains("ngrok.app"));
-
-        if (allowed) {
+        if (origin != null && (origin.contains("localhost") || origin.contains("127.0.0.1") || origin.contains("ngrok"))) {
             res.setHeader("Access-Control-Allow-Origin", origin);
             res.setHeader("Access-Control-Allow-Credentials", "true");
-        } else {
-            res.setHeader("Access-Control-Allow-Origin", "null");
         }
-
         res.setHeader("Vary", "Origin");
         res.setHeader("Access-Control-Allow-Methods", "GET, OPTIONS");
         res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization, ngrok-skip-browser-warning");
-        res.setHeader("Access-Control-Expose-Headers", "Authorization");
         res.setHeader("Access-Control-Max-Age", "86400");
     }
 
@@ -50,73 +35,82 @@ public class EventStatsController extends HttpServlet {
     }
 
     @Override
-    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws IOException {
+    protected void doGet(HttpServletRequest req, HttpServletResponse resp) throws ServletException, IOException {
         setCorsHeaders(resp, req);
         resp.setContentType("application/json;charset=UTF-8");
+        PrintWriter out = resp.getWriter();
 
-        // 1. JWT Authentication (Giữ nguyên logic cũ của bạn)
-        String authHeader = req.getHeader("Authorization");
-        if (authHeader == null || !authHeader.startsWith("Bearer ")) {
-            resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            resp.getWriter().write("{\"error\":\"Missing or invalid Authorization header\"}");
-            return;
-        }
-
-        String token = authHeader.substring(7);
-        if (!JwtUtils.validateToken(token)) {
-            resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
-            resp.getWriter().write("{\"error\":\"Invalid or expired token\"}");
-            return;
-        }
-
-        // 2. Authorization (Chỉ cho phép ORGANIZER hoặc STAFF)
-        String role = JwtUtils.getRoleFromToken(token);
-        if (role == null || !(role.equalsIgnoreCase("ORGANIZER") || role.equalsIgnoreCase("STAFF") || role.equalsIgnoreCase("ADMIN"))) {
-            resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
-            resp.getWriter().write("{\"error\":\"Permission denied. ORGANIZER, STAFF or ADMIN only.\"}");
-            return;
-        }
-
-        // 3. Lấy tham số eventId
-        String eventIdStr = req.getParameter("eventId");
-        if (eventIdStr == null) {
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            resp.getWriter().write("{\"error\":\"Missing eventId parameter\"}");
-            return;
-        }
-
-        int eventId;
         try {
-            eventId = Integer.parseInt(eventIdStr);
-        } catch (NumberFormatException e) {
-            resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
-            resp.getWriter().write("{\"error\":\"eventId must be a number\"}");
-            return;
-        }
-
-        // 4. Lấy tham số date (Mới thêm)
-        String dateParam = req.getParameter("date");
-        LocalDate filterDate = null;
-        if (dateParam != null && !dateParam.trim().isEmpty()) {
-            try {
-                filterDate = LocalDate.parse(dateParam);
-            } catch (DateTimeParseException e) {
-                // Nếu ngày sai định dạng thì bỏ qua lọc ngày, không return lỗi
+            // 1. JWT Authentication & Validation
+            String authHeader = req.getHeader("Authorization");
+            if (authHeader == null || !authHeader.startsWith("Bearer ")) {
+                resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                out.print("{\"error\":\"Missing or invalid Authorization header\"}");
+                return;
             }
+
+            String token = authHeader.substring(7);
+            if (!JwtUtils.validateToken(token)) {
+                resp.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+                out.print("{\"error\":\"Invalid or expired token\"}");
+                return;
+            }
+
+            // 2. Lấy Role và UserId từ Token
+            String role = JwtUtils.getRoleFromToken(token);
+            int userId = JwtUtils.getIdFromToken(token); 
+
+            if (role == null || !(role.equalsIgnoreCase("ORGANIZER") || role.equalsIgnoreCase("STAFF") || role.equalsIgnoreCase("ADMIN"))) {
+                resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                out.print("{\"error\":\"Permission denied.\"}");
+                return;
+            }
+
+            // 3. Lấy và kiểm tra tham số eventId
+            String eventIdStr = req.getParameter("eventId");
+            if (eventIdStr == null || eventIdStr.isEmpty()) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                out.print("{\"error\":\"Missing eventId parameter\"}");
+                return;
+            }
+
+            int eventId;
+            try {
+                eventId = Integer.parseInt(eventIdStr);
+            } catch (NumberFormatException e) {
+                resp.setStatus(HttpServletResponse.SC_BAD_REQUEST);
+                out.print("{\"error\":\"eventId must be a number\"}");
+                return;
+            }
+
+            // 4. KIỂM TRA SỰ TỒN TẠI CỦA EVENT (Dành cho cả Admin và Organizer)
+            // Bạn cần thêm hàm checkEventExists vào TicketDAO như đã trao đổi
+            boolean exists = ticketDAO.checkEventExists(eventId);
+            if (!exists) {
+                resp.setStatus(HttpServletResponse.SC_NOT_FOUND); // Trả về 404
+                out.print("{\"error\":\"no data found\"}");
+                return;
+            }
+
+            // 5. Nếu Event tồn tại, tiến hành lấy số liệu theo phân quyền
+            EventStatsResponse stats = ticketDAO.getEventStatsByRole(role, userId, eventId);
+
+            // 6. Kiểm tra quyền sở hữu đối với ORGANIZER
+            // Nếu Event có tồn tại nhưng Organizer này không tạo (totalRegistered = 0 do SQL JOIN chặn)
+            if (role.equalsIgnoreCase("ORGANIZER") && stats.getTotalRegistered() == 0) {
+                resp.setStatus(HttpServletResponse.SC_FORBIDDEN); // Trả về 403
+                out.print("{\"error\":\"You do not have permission to view this event's statistics.\"}");
+                return;
+            }
+
+            // 7. Trả về kết quả thành công
+            resp.setStatus(HttpServletResponse.SC_OK);
+            out.print(gson.toJson(stats));
+
+        } catch (Exception e) {
+            e.printStackTrace();
+            resp.setStatus(HttpServletResponse.SC_INTERNAL_SERVER_ERROR);
+            out.print("{\"error\":\"Internal server error: " + e.getMessage() + "\"}");
         }
-
-        // 5. Gọi TicketDAO (Hàm mới có tham số filterDate)
-        // Lưu ý: Đảm bảo TicketDAO đã có hàm getEventStats(int, LocalDate) trả về EventStatsResponse
-        EventStatsResponse stats = ticketDAO.getEventStats(eventId);
-
-        if (stats == null) {
-            resp.setStatus(404);
-            resp.getWriter().write("{\"error\":\"No data found\"}");
-            return;
-        }
-
-        // Đảm bảo trả về đúng DTO có đủ các trường bạn yêu cầu
-        resp.setStatus(200);
-        resp.getWriter().write(gson.toJson(stats));
     }
 }
