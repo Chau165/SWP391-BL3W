@@ -120,4 +120,11 @@ public class ValidationUtil {
             return false;
         return PASSWORD_PATTERN.matcher(password).matches();
     }
+    
+    public static boolean isValidRoleForCreation(String role) {
+    if (role == null) return false;
+    String r = role.toUpperCase();
+    // Chỉ cho phép 3 role này được tạo thông qua API của Admin
+    return r.equals("STAFF") || r.equals("ORGANIZER") || r.equals("ADMIN");
+}
 }

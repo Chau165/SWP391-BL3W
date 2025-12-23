@@ -1005,6 +1005,21 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}"
                 + "}";
 
+        // ===== API: /api/admin/create-account (Admin Only) =====
+        String adminCreatePath = "\"/api/admin/create-account\":{"
+                + "\"post\":{"
+                + "\"tags\":[\"Admin\"],"
+                + "\"summary\":\"[Admin Only] Tạo tài khoản mới cho Staff/Organizer/Admin\","
+                + "\"security\":[{\"bearerAuth\":[]}],"
+                + "\"requestBody\":{\"required\":true,\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AdminCreateAccountRequest\"}}}},"
+                + "\"responses\":{"
+                + "\"201\":{\"description\":\"Tạo thành công\"},"
+                + "\"400\":{\"description\":\"Lỗi định dạng hoặc trùng Email/Phone\"},"
+                + "\"403\":{\"description\":\"Không có quyền Admin\"}"
+                + "}"
+                + "}"
+                + "}";
+
         // ================================
         // ========== GHÉP JSON ===========
         // ================================
@@ -1041,6 +1056,7 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + myTicketsPath + ","
                 + eventStatsPath + ","
                 + ticketListPath + ","
+                + adminCreatePath + ","
                 + myBillsPath
                 + "},"
                 + "\"components\":{"
@@ -1454,7 +1470,16 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "\"checkOutRate\":{\"type\":\"string\", \"example\":\"30.0%\"},"
                 + "\"totalRefunded\":{\"type\":\"integer\", \"description\":\"Số vé đã REFUNDED\"},"
                 + "\"refundedRate\":{\"type\":\"string\", \"example\":\"5.0%\"}"
-                + "}}"
+                + "}},"
+                // Schema: AdminCreateAccountController
+                + "\"AdminCreateAccountRequest\":{\"type\":\"object\",\"properties\":{"
+                + "\"fullName\":{\"type\":\"string\",\"example\":\"string\"},"
+                + "\"phone\":{\"type\":\"string\",\"example\":\"string\"},"
+                + "\"email\":{\"type\":\"string\",\"example\":\"string\"},"
+                + "\"password\":{\"type\":\"string\",\"format\":\"password\",\"example\":\"string\"},"
+                // Đoạn enum dưới đây tạo ra Combobox
+                + "\"role\":{\"type\":\"string\",\"enum\":[\"STAFF\",\"ORGANIZER\",\"ADMIN\"],\"example\":\"STAFF\"}"
+                + "},\"required\":[\"fullName\",\"phone\",\"email\",\"password\",\"role\"]}"
                 + "}" // end schemas
                 + "}" // end components
                 + "}";  // end root
