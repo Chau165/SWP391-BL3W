@@ -63,7 +63,7 @@ public class StaffSystemConfigController extends HttpServlet {
      *      (có thể đổi sau: STAFF/ADMIN đều xem được).
      */
     private boolean canViewConfig(String role) {
-        return role != null && "STAFF".equalsIgnoreCase(role);
+        return role != null && "ADMIN".equalsIgnoreCase(role);
     }
 
     /**
@@ -72,7 +72,7 @@ public class StaffSystemConfigController extends HttpServlet {
      * - Hiện tại bạn cũng cho STAFF update.
      */
     private boolean canUpdateConfig(String role) {
-        return role != null && "STAFF".equalsIgnoreCase(role);
+        return role != null && "ADMIN".equalsIgnoreCase(role);
     }
 
     /**
