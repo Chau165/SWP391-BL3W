@@ -867,40 +867,72 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}"
                 + "}";
 
-        // ===== API: /api/events/stats (Thống kê) =====
-        String eventStatsPath
-                = "\"/api/events/stats\":{"
+        // ===== API: /api/events/stats (Thống kê số liệu tổng quan) =====
+        String eventStatsPath = "\"/api/events/stats\":{"
                 + "\"get\":{"
-                + "\"summary\":\"[Organizer] Thống kê số lượng tham dự\","
-                + "\"description\":\"Đếm tổng số vé đăng ký và số người đã check-in thực tế\","
+                + "\"tags\":[\"Statistics\"],"
+                + "\"summary\":\"[Admin/Organizer] Xem các chỉ số thống kê (Dashboard)\","
+                + "\"description\":\"Trả về các con số tổng quan: Total Registered, Booking, Check-in, Check-out, Refunded và các tỉ lệ phần trăm tương ứng. "
+                + "Logic: Admin thấy toàn bộ. Organizer chỉ thấy số liệu của sự kiện mình tạo. " // ĐÃ XÓA câu: Có thể lọc theo ngày.
+                + "Status tính toán: BOOKED, CHECKED_IN, CHECKED_OUT, REFUNDED.\","
+                + "\"security\":[{\"bearerAuth\":[]}],"
+                + "\"parameters\":["
+                // ĐÃ XÓA phần name: "date" ở đây
+                + "  {"
+                + "    \"name\":\"eventId\","
+                + "    \"in\":\"query\","
+                + "    \"required\":false,"
+                + "    \"schema\":{\"type\":\"integer\"},"
+                + "    \"description\":\"(Optional) Lọc theo Event ID cụ thể.\""
+                + "  }"
+                + "],"
+                + "\"responses\":{"
+                + "  \"200\":{"
+                + "    \"description\":\"Số liệu thống kê thành công\","
+                + "    \"content\":{"
+                + "      \"application/json\":{"
+                + "        \"schema\":{\"$ref\":\"#/components/schemas/EventStatsResponse\"}"
+                + "      }"
+                + "    }"
+                + "  },"
+                + "  \"401\":{\"description\":\"Unauthorized\"},"
+                + "  \"403\":{\"description\":\"Forbidden (Role không hợp lệ)\"}"
+                + "}"
+                + "}"
+                + "}";
+
+        // ===== API: /api/tickets/list (Danh sách vé chi tiết) =====
+        String ticketListPath = "\"/api/tickets/list\":{"
+                + "\"get\":{"
+                + "\"tags\":[\"Report\"],"
+                + "\"summary\":\"[Admin/Organizer] Lấy danh sách chi tiết vé (Table Data)\","
+                + "\"description\":\"Trả về danh sách chi tiết từng vé (MyTicketResponse). "
+                + "Admin/Staff thấy toàn bộ dữ liệu. Organizer chỉ thấy vé thuộc các sự kiện do mình tạo. "
+                + "Hệ thống lọc các vé có trạng thái: BOOKED, CHECKED_IN, CHECKED_OUT, REFUNDED.\"," // Cập nhật trạng thái
                 + "\"security\":[{\"bearerAuth\":[]}],"
                 + "\"parameters\":["
                 + "  {"
                 + "    \"name\":\"eventId\","
                 + "    \"in\":\"query\","
-                + "    \"required\":true,"
+                + "    \"required\":false,"
                 + "    \"schema\":{\"type\":\"integer\"},"
-                + "    \"description\":\"ID của sự kiện cần xem\""
+                + "    \"description\":\"(Optional) Lọc theo Event ID.\""
                 + "  }"
+                // Lưu ý: Nếu DAO đã bỏ lọc theo date, bạn nên xóa parameter date ở đây để tránh làm FE hiểu lầm
                 + "],"
                 + "\"responses\":{"
                 + "  \"200\":{"
-                + "    \"description\":\"Thông tin thống kê\","
+                + "    \"description\":\"Danh sách vé chi tiết\","
                 + "    \"content\":{"
                 + "      \"application/json\":{"
                 + "        \"schema\":{"
-                + "          \"type\":\"object\","
-                + "          \"properties\":{"
-                + "            \"eventId\":{\"type\":\"integer\", \"example\": 1},"
-                + "            \"totalRegistered\":{\"type\":\"integer\", \"example\": 100},"
-                + "            \"totalCheckedIn\":{\"type\":\"integer\", \"example\": 85},"
-                + "            \"checkInRate\":{\"type\":\"string\", \"example\": \"85.0%\"}"
-                + "          }"
+                + "          \"type\":\"array\","
+                + "          \"items\":{\"$ref\":\"#/components/schemas/MyTicketResponse\"}"
                 + "        }"
                 + "      }"
                 + "    }"
                 + "  },"
-                + "  \"403\":{\"description\":\"Không có quyền (Chỉ Organizer/Admin)\"}"
+                + "  \"403\":{\"description\":\"Forbidden\"}"
                 + "}"
                 + "}"
                 + "}";
@@ -973,6 +1005,21 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "}"
                 + "}";
 
+        // ===== API: /api/admin/create-account (Admin Only) =====
+        String adminCreatePath = "\"/api/admin/create-account\":{"
+                + "\"post\":{"
+                + "\"tags\":[\"Admin\"],"
+                + "\"summary\":\"[Admin Only] Tạo tài khoản mới cho Staff/Organizer/Admin\","
+                + "\"security\":[{\"bearerAuth\":[]}],"
+                + "\"requestBody\":{\"required\":true,\"content\":{\"application/json\":{\"schema\":{\"$ref\":\"#/components/schemas/AdminCreateAccountRequest\"}}}},"
+                + "\"responses\":{"
+                + "\"201\":{\"description\":\"Tạo thành công\"},"
+                + "\"400\":{\"description\":\"Lỗi định dạng hoặc trùng Email/Phone\"},"
+                + "\"403\":{\"description\":\"Không có quyền Admin\"}"
+                + "}"
+                + "}"
+                + "}";
+
         // ================================
         // ========== GHÉP JSON ===========
         // ================================
@@ -1008,6 +1055,8 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + venueAreasPath + ","
                 + myTicketsPath + ","
                 + eventStatsPath + ","
+                + ticketListPath + ","
+                + adminCreatePath + ","
                 + myBillsPath
                 + "},"
                 + "\"components\":{"
@@ -1393,7 +1442,44 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "\"capacity\":{\"type\":\"integer\"}"
                 + "},"
                 + "\"required\":[\"venueId\",\"areaName\",\"capacity\"]"
-                + "}"
+                + "},"
+                // Schema: MyTicketResponse (Dùng chung cho API danh sách vé & thống kê)
+                + "\"MyTicketResponse\":{\"type\":\"object\",\"properties\":{"
+                + "\"ticketId\":{\"type\":\"integer\"},"
+                + "\"ticketCode\":{\"type\":\"string\"},"
+                + "\"eventName\":{\"type\":\"string\"},"
+                + "\"venueName\":{\"type\":\"string\"}," // Thêm trường này để Swagger hiển thị đúng
+                + "\"startTime\":{\"type\":\"string\",\"format\":\"date-time\"},"
+                + "\"status\":{\"type\":\"string\", \"enum\":[\"BOOKED\",\"CHECKED_IN\",\"CHECKED_OUT\",\"REFUNDED\"]}," // Thêm REFUNDED
+                + "\"checkInTime\":{\"type\":\"string\",\"format\":\"date-time\"},"
+                + "\"checkOutTime\":{\"type\":\"string\",\"format\":\"date-time\"},"
+                + "\"category\":{\"type\":\"string\"},"
+                + "\"categoryPrice\":{\"type\":\"number\"},"
+                + "\"seatCode\":{\"type\":\"string\"},"
+                + "\"buyerName\":{\"type\":\"string\"},"
+                + "\"purchaseDate\":{\"type\":\"string\",\"format\":\"date-time\"}"
+                + "}},"
+                // Schema: EventStatsResponse (Dùng cho API stats)
+                + "\"EventStatsResponse\":{\"type\":\"object\",\"properties\":{"
+                + "\"totalRegistered\":{\"type\":\"integer\", \"description\":\"Tổng số vé đã bán (tất cả trạng thái)\"},"
+                + "\"totalBooking\":{\"type\":\"integer\", \"description\":\"Số vé đang BOOKED\"},"
+                + "\"bookingRate\":{\"type\":\"string\", \"example\":\"20.5%\"},"
+                + "\"totalCheckedIn\":{\"type\":\"integer\", \"description\":\"Số vé đã CHECKED_IN\"},"
+                + "\"checkInRate\":{\"type\":\"string\", \"example\":\"50.0%\"},"
+                + "\"totalCheckedOut\":{\"type\":\"integer\", \"description\":\"Số vé đã CHECKED_OUT\"},"
+                + "\"checkOutRate\":{\"type\":\"string\", \"example\":\"30.0%\"},"
+                + "\"totalRefunded\":{\"type\":\"integer\", \"description\":\"Số vé đã REFUNDED\"},"
+                + "\"refundedRate\":{\"type\":\"string\", \"example\":\"5.0%\"}"
+                + "}},"
+                // Schema: AdminCreateAccountController
+                + "\"AdminCreateAccountRequest\":{\"type\":\"object\",\"properties\":{"
+                + "\"fullName\":{\"type\":\"string\",\"example\":\"string\"},"
+                + "\"phone\":{\"type\":\"string\",\"example\":\"string\"},"
+                + "\"email\":{\"type\":\"string\",\"example\":\"string\"},"
+                + "\"password\":{\"type\":\"string\",\"format\":\"password\",\"example\":\"string\"},"
+                // Đoạn enum dưới đây tạo ra Combobox
+                + "\"role\":{\"type\":\"string\",\"enum\":[\"STAFF\",\"ORGANIZER\",\"ADMIN\"],\"example\":\"STAFF\"}"
+                + "},\"required\":[\"fullName\",\"phone\",\"email\",\"password\",\"role\"]}"
                 + "}" // end schemas
                 + "}" // end components
                 + "}";  // end root

@@ -279,7 +279,7 @@ public class ReportDAO {
                 return result;
             }
 
-            // Nếu reject -> chỉ update report
+            // Nếu reject -> chỉ update report (không cần validate CHECKED_IN)
             if (!approve) {
                 String sqlReject
                         = "UPDATE Report "
@@ -302,6 +302,34 @@ public class ReportDAO {
                 conn.commit();
                 result.success = true;
                 result.message = "Đã từ chối report";
+                return result;
+            }
+
+            // =========================
+            // VALIDATE: chỉ hoàn tiền khi Ticket.status = CHECKED_IN
+            // Lock luôn row Ticket để tránh race-condition
+            // =========================
+            String ticketStatus = null;
+            String sqlGetTicketStatus
+                    = "SELECT status "
+                    + "FROM Ticket WITH (UPDLOCK, ROWLOCK) "
+                    + "WHERE ticket_id = ?";
+
+            try ( PreparedStatement ps = conn.prepareStatement(sqlGetTicketStatus)) {
+                ps.setInt(1, ticketId);
+                try ( ResultSet rs = ps.executeQuery()) {
+                    if (!rs.next()) {
+                        conn.rollback();
+                        result.message = "Không tìm thấy ticket";
+                        return result;
+                    }
+                    ticketStatus = rs.getNString("status");
+                }
+            }
+
+            if (ticketStatus == null || !"CHECKED_IN".equalsIgnoreCase(ticketStatus.trim())) {
+                conn.rollback();
+                result.message = "Chỉ hoàn tiền cho vé đã CHECKED_IN";
                 return result;
             }
 
@@ -342,15 +370,15 @@ public class ReportDAO {
                 }
             }
 
-            // 4) Update Ticket.status = REFUND
+            // 4) Update Ticket.status = REFUNDED (chỉ update nếu đang CHECKED_IN)
             // (Bạn nhớ đảm bảo Ticket.status cho phép giá trị 'REFUNDED' nếu có CHECK constraint)
-            String sqlUpdateTicket = "UPDATE Ticket SET status = N'REFUNDED' WHERE ticket_id = ?";
+            String sqlUpdateTicket = "UPDATE Ticket SET status = N'REFUNDED' WHERE ticket_id = ? AND status = N'CHECKED_IN'";
             try ( PreparedStatement ps = conn.prepareStatement(sqlUpdateTicket)) {
                 ps.setInt(1, ticketId);
                 int rows = ps.executeUpdate();
                 if (rows <= 0) {
                     conn.rollback();
-                    result.message = "Không cập nhật được trạng thái ticket";
+                    result.message = "Không cập nhật được trạng thái ticket (ticket không còn CHECKED_IN)";
                     return result;
                 }
             }

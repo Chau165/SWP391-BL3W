@@ -138,11 +138,11 @@ public class VenueController extends HttpServlet {
             return;
         }
         String role = JwtUtils.getRoleFromToken(token);
-        if (role == null || !"STAFF".equalsIgnoreCase(role)) {
+        if (role == null || !"ADMIN".equalsIgnoreCase(role)) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
             Map<String, Object> m = new HashMap<>();
             m.put("status", "fail");
-            m.put("message", "STAFF role required");
+            m.put("message", "ADMIN role required");
             out.print(gson.toJson(m));
             return;
         }
@@ -218,11 +218,11 @@ public class VenueController extends HttpServlet {
             return;
         }
         String role = JwtUtils.getRoleFromToken(token);
-        if (role == null || !"STAFF".equalsIgnoreCase(role)) {
+        if (role == null || !"ADMIN".equalsIgnoreCase(role)) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
             Map<String, Object> m = new HashMap<>();
             m.put("status", "fail");
-            m.put("message", "STAFFSTAFF role required");
+            m.put("message", "ADMIN role required");
             out.print(gson.toJson(m));
             return;
         }
@@ -337,11 +337,11 @@ public class VenueController extends HttpServlet {
             return;
         }
         String role = JwtUtils.getRoleFromToken(token);
-        if (role == null || !"STAFF".equalsIgnoreCase(role)) {
+        if (role == null || !"ADMIN".equalsIgnoreCase(role)) {
             resp.setStatus(HttpServletResponse.SC_FORBIDDEN);
             Map<String, Object> m = new HashMap<>();
             m.put("status", "fail");
-            m.put("message", "STAFFSTAFF role required");
+            m.put("message", "ADMIN role required");
             out.print(gson.toJson(m));
             return;
         }

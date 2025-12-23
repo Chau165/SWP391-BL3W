@@ -33,6 +33,7 @@ package DAO;
  * ProfileController - Utils: PasswordUtils (hash/verify password) - Config:
  * mylib/DBUtils (database connection)
  */
+import DTO.AdminCreateAccountRequest;
 import DTO.Users;
 import mylib.DBUtils;
 import utils.PasswordUtils;
@@ -239,6 +240,52 @@ public class UsersDAO {
         }
 
         return user;
+    }
+    
+        // 1. Kiểm tra Email đã tồn tại chưa
+    public boolean isEmailExists(String email) {
+        String sql = "SELECT user_id FROM Users WHERE email = ?";
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, email);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next(); // Trả về true nếu tìm thấy email
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return false;
+    }
+
+    // 2. Kiểm tra Số điện thoại đã tồn tại chưa
+    public boolean isPhoneExists(String phone) {
+        String sql = "SELECT user_id FROM Users WHERE phone = ?";
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, phone);
+            try (ResultSet rs = ps.executeQuery()) {
+                return rs.next();
+            }
+        } catch (Exception e) { e.printStackTrace(); }
+        return false;
+    }
+
+    // 3. Hàm tạo tài khoản chính thức
+    public boolean adminCreateAccount(AdminCreateAccountRequest req, String passwordHash) {
+        // Wallet mặc định 0.00 và status mặc định ACTIVE theo yêu cầu
+        String sql = "INSERT INTO Users (full_name, email, phone, password_hash, role, status, created_at, Wallet) "
+                   + "VALUES (?, ?, ?, ?, ?, 'ACTIVE', GETDATE(), 0.00)";
+        
+        try (Connection conn = DBUtils.getConnection();
+             PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setString(1, req.getFullName());
+            ps.setString(2, req.getEmail());
+            ps.setString(3, req.getPhone());
+            ps.setString(4, passwordHash);
+            ps.setString(5, req.getRole().toUpperCase());
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+            return false;
+        }
     }
 
     // =========================
