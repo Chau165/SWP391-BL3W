@@ -309,4 +309,44 @@ public class UsersDAO {
         return s == null || s.trim().isEmpty();
     }
 
+      public StaffOrganizerResponse getStaffAndOrganizer() {
+        String sql = "SELECT user_id, full_name, email, phone, role, status, Wallet "
+                + "FROM Users "
+                + "WHERE status = ? AND role IN (?, ?)";
+
+        List<Users> staffList = new ArrayList<>();
+        List<Users> organizerList = new ArrayList<>();
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setString(1, "ACTIVE");
+            ps.setString(2, "STAFF");
+            ps.setString(3, "ORGANIZER");
+
+            try ( ResultSet rs = ps.executeQuery()) {
+                while (rs.next()) {
+                    Users u = new Users();
+                    u.setId(rs.getInt("user_id"));
+                    u.setFullName(rs.getNString("full_name"));
+                    u.setEmail(rs.getNString("email"));
+                    u.setPhone(rs.getString("phone"));
+                    u.setRole(rs.getString("role"));
+                    u.setStatus(rs.getString("status"));
+                    u.setWallet(rs.getBigDecimal("Wallet"));
+                    // ❌ KHÔNG set createdAt
+
+                    if ("STAFF".equalsIgnoreCase(u.getRole())) {
+                        staffList.add(u);
+                    } else {
+                        organizerList.add(u);
+                    }
+                }
+            }
+
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        return new StaffOrganizerResponse(staffList, organizerList);
+    }
 }
