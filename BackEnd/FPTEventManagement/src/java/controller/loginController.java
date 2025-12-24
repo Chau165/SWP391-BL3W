@@ -158,9 +158,9 @@ public class loginController extends HttpServlet {
             if (user != null) {
 
                 // DB đang dùng status: 'ACTIVE','INACTIVE','BLOCKED'
-                if ("BLOCKED".equalsIgnoreCase(user.getStatus())) {
+                if ("INACTIVE".equalsIgnoreCase(user.getStatus())) {
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
-                    out.print(jsonFail("Tài khoản bị khóa", "AUTH_BLOCKED"));
+                    out.print(jsonFail("Tài khoản đã bị vô hiệu", "AUTH_BLOCKED"));
                     out.flush();
                     return;
                 }
