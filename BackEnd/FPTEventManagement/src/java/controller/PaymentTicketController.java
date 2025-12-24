@@ -274,6 +274,7 @@ public class PaymentTicketController extends HttpServlet {
              *   => Ticket là bảng giao dịch (PENDING/BOOKED), Event_Seat_Layout là cấu hình mở bán.
              */
             try {
+                //Bước này dùng để kiểm tra trong bảng Ticket xem có vé nào đã tồn tại cho các seat_id đó hay chưa
                 List<Integer> alreadyBookedSeatIds = seatDAO.findAlreadyBookedSeatIdsForEvent(eventId, seatIds);
                 if (!alreadyBookedSeatIds.isEmpty()) {
                     // ✅ STATUS CODE: 400 Bad Request

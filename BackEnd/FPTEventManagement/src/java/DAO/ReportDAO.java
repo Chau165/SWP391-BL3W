@@ -80,12 +80,18 @@ public class ReportDAO {
                 = "SELECT "
                 + "  r.report_id, r.ticket_id, r.title, r.description, r.image_url, r.created_at, r.status AS report_status, "
                 + "  u.user_id AS student_id, u.full_name AS student_name, "
-                + "  t.status AS ticket_status, t.category_ticket_id, "
-                + "  ct.name AS category_ticket_name, ct.price "
+                + "  t.status AS ticket_status, t.category_ticket_id, t.seat_id, "
+                + "  ct.name AS category_ticket_name, ct.price, "
+                + "  s.seat_code, s.row_no, s.col_no, "
+                + "  va.area_id, va.area_name, va.floor, "
+                + "  v.venue_id, v.venue_name, v.location "
                 + "FROM Report r "
                 + "JOIN Users u ON u.user_id = r.user_id "
                 + "JOIN Ticket t ON t.ticket_id = r.ticket_id "
                 + "JOIN Category_Ticket ct ON ct.category_ticket_id = t.category_ticket_id "
+                + "LEFT JOIN Seat s ON s.seat_id = t.seat_id "
+                + "LEFT JOIN Venue_Area va ON va.area_id = s.area_id "
+                + "LEFT JOIN Venue v ON v.venue_id = va.venue_id "
                 + "WHERE r.report_id = ?";
 
         try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -114,15 +120,29 @@ public class ReportDAO {
                     dto.setCategoryTicketName(rs.getNString("category_ticket_name"));
                     dto.setPrice(rs.getBigDecimal("price"));
 
+                    // --- thêm thông tin ghế & khu vực/địa điểm ---
+                    // seat
+                    dto.setSeatId(rs.getInt("seat_id"));                 // nếu field này có trong DTO
+                    dto.setSeatCode(rs.getNString("seat_code"));
+                    dto.setRowNo(rs.getNString("row_no"));
+                    dto.setColNo(rs.getInt("col_no"));
+
+                    // area
+                    dto.setAreaId(rs.getInt("area_id"));
+                    dto.setAreaName(rs.getNString("area_name"));
+                    dto.setFloor(rs.getInt("floor"));
+
+                    // venue
+                    dto.setVenueId(rs.getInt("venue_id"));
+                    dto.setVenueName(rs.getNString("venue_name"));
+                    dto.setLocation(rs.getNString("location"));
+
                     return dto;
                 }
             }
-
         } catch (Exception e) {
-            System.err.println("[ERROR] getReportDetailForStaff: " + e.getMessage());
             e.printStackTrace();
         }
-
         return null;
     }
 

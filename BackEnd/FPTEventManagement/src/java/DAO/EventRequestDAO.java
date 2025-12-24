@@ -63,7 +63,7 @@ public class EventRequestDAO {
         return null;
     }
 
-    public List<EventRequest> getRequestsByStudent(int requesterId) {
+    public List<EventRequest> getRequestsByUserId(int requesterId) {
         List<EventRequest> list = new ArrayList<>();
 
         String sql

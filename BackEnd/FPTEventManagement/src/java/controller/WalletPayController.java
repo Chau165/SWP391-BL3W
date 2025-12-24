@@ -294,7 +294,7 @@ public class WalletPayController extends HttpServlet {
                     String seatCodes = seats.stream().map(Seat::getSeatCode).collect(Collectors.joining(", "));
                     String ticketIdsStringForEmail = createdTempTicketIds.stream().map(String::valueOf).collect(Collectors.joining(", "));
 
-                    // ticketTypes display
+                    // ticketTypes display (hiển thị loại vé, bằng cách phân loại gửi về mail)
                     Map<Integer, Long> catCount = categoryIdsForSeats.stream()
                             .collect(Collectors.groupingBy(x -> x, Collectors.counting()));
 
@@ -307,7 +307,7 @@ public class WalletPayController extends HttpServlet {
                     Collections.sort(catParts);
                     String ticketTypesForEmail = String.join(", ", catParts);
 
-                    // gộp QR
+                    // gộp QR (mã qr để gủi về mail, nếu mua nhiều sẽ lấy hết vé để gộp vào qr luôn)
                     String qrContent = (createdTempTicketIds.size() == 1)
                             ? String.valueOf(createdTempTicketIds.get(0))
                             : "TICKETS:" + createdTempTicketIds.stream().map(String::valueOf).collect(Collectors.joining(","));
@@ -392,6 +392,7 @@ public class WalletPayController extends HttpServlet {
             String ticketIdsString = createdTempTicketIds.stream().map(String::valueOf).collect(Collectors.joining(","));
 
 // get new wallet for redirect (quick demo)
+            //Biến newWallet để ghi lại số tiền trong ví hiện tại của user là nhiêu để trả về cho bên FE hiển thị lại
             BigDecimal newWallet = null;
             try ( Connection c2 = DBUtils.getConnection()) {
                 newWallet = walletDAO.getWalletByUserId(c2, userId); // bạn cần DAO method này (bên dưới)

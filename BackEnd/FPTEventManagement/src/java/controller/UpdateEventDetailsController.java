@@ -1,5 +1,6 @@
 package controller;
-
+//Controller này là để update cho cả sự kiện chưa mở và sự kiện đã mở. Nếu chưa mở thì trạng thái là CLOSED cho phép Cập nhật hết. 
+//Nếu status là OPEN thì chỉ cho phép cập nhật trừ số lượng ghế đã set từ đầu.
 import DAO.EventDAO;
 import DAO.EventRequestDAO;
 import DAO.SpeakerDAO;

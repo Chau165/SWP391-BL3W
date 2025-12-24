@@ -137,7 +137,6 @@ public class GetMyEventRequestsController extends HttpServlet {
         /**
          * Lấy list request của organizer theo userId.
          *
-         * Lưu ý: tên hàm getRequestsByStudent(userId) có thể đặt tên chưa chuẩn
          * nhưng ý nghĩa là: lấy theo requesterId (organizer tạo request).
          *
          * CÂU HỎI THẦY/CÔ:
@@ -146,7 +145,7 @@ public class GetMyEventRequestsController extends HttpServlet {
          * - "DAO join processedByName để làm gì?"
          *   => FE hiển thị ai đã duyệt request (Staff), tránh FE phải gọi thêm API khác.
          */
-        List<EventRequest> list = eventRequestDAO.getRequestsByStudent(userId);
+        List<EventRequest> list = eventRequestDAO.getRequestsByUserId(userId);
 
         /**
          * Trả list ra JSON

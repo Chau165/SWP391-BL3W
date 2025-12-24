@@ -30,6 +30,8 @@ public class VenueAreaDAO {
                 = "SELECT va.area_id, va.venue_id, va.area_name, va.floor, va.capacity, va.status "
                 + "FROM Venue_Area va "
                 + "WHERE va.status = 'AVAILABLE' "
+                //👉 Loại bỏ các khu vực mà đã có event trùng thời gian kiêmr tra xem ở khu vực đó trong khoảng 
+                //thời gian đó có sự kiện nào được gắn với khu vực đó không thông qua trạng thái là OPEN CLOSED
                 + "  AND NOT EXISTS ( "
                 + "      SELECT 1 FROM Event e "
                 + "      WHERE e.area_id = va.area_id "

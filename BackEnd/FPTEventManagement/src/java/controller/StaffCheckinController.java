@@ -209,6 +209,7 @@ public class StaffCheckinController extends HttpServlet {
             String currentStatus = ticket.getStatus();
             item.addProperty("currentStatus", currentStatus);
 
+            //Nếu vé đang check in mà đã check in sẽ hiện như này (Tránh trường hợp vé check in, check in lại)
             if ("CHECKED_IN".equalsIgnoreCase(currentStatus)) {
                 String checkinTimeStr = ticket.getCheckinTime() != null
                         ? dateFormat.format(ticket.getCheckinTime())
@@ -223,6 +224,7 @@ public class StaffCheckinController extends HttpServlet {
                 continue;
             }
 
+            //Kiểm tra các status khác của vé có thể rơi vào những vé nào status != BOOKED thì đều không thỏa
             if (!"BOOKED".equalsIgnoreCase(currentStatus)) {
                 String statusMsg;
                 switch (currentStatus.toUpperCase()) {
@@ -245,6 +247,7 @@ public class StaffCheckinController extends HttpServlet {
                 continue;
             }
 
+            //Nếu chạy hết ở trên qua hết xuông dưới đây sẽ thỏa cập nhật trạng thái của vé thành check in
             boolean ok = ticketDAO.checkinTicket(ticketId, now);
             if (!ok) {
                 item.addProperty("success", false);

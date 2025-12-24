@@ -34,6 +34,7 @@ package DAO;
  * mylib/DBUtils (database connection)
  */
 import DTO.AdminCreateAccountRequest;
+import DTO.StaffOrganizerResponse;
 import DTO.Users;
 import mylib.DBUtils;
 import utils.PasswordUtils;
@@ -44,6 +45,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.List;
 
 public class UsersDAO {
 
@@ -241,30 +244,32 @@ public class UsersDAO {
 
         return user;
     }
-    
-        // 1. Kiểm tra Email đã tồn tại chưa
+
+    // 1. Kiểm tra Email đã tồn tại chưa
     public boolean isEmailExists(String email) {
         String sql = "SELECT user_id FROM Users WHERE email = ?";
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, email);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 return rs.next(); // Trả về true nếu tìm thấy email
             }
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         return false;
     }
 
     // 2. Kiểm tra Số điện thoại đã tồn tại chưa
     public boolean isPhoneExists(String phone) {
         String sql = "SELECT user_id FROM Users WHERE phone = ?";
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, phone);
-            try (ResultSet rs = ps.executeQuery()) {
+            try ( ResultSet rs = ps.executeQuery()) {
                 return rs.next();
             }
-        } catch (Exception e) { e.printStackTrace(); }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         return false;
     }
 
@@ -272,10 +277,9 @@ public class UsersDAO {
     public boolean adminCreateAccount(AdminCreateAccountRequest req, String passwordHash) {
         // Wallet mặc định 0.00 và status mặc định ACTIVE theo yêu cầu
         String sql = "INSERT INTO Users (full_name, email, phone, password_hash, role, status, created_at, Wallet) "
-                   + "VALUES (?, ?, ?, ?, ?, 'ACTIVE', GETDATE(), 0.00)";
-        
-        try (Connection conn = DBUtils.getConnection();
-             PreparedStatement ps = conn.prepareStatement(sql)) {
+                + "VALUES (?, ?, ?, ?, ?, 'ACTIVE', GETDATE(), 0.00)";
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
             ps.setString(1, req.getFullName());
             ps.setString(2, req.getEmail());
             ps.setString(3, req.getPhone());
@@ -286,6 +290,44 @@ public class UsersDAO {
             e.printStackTrace();
             return false;
         }
+    }
+
+    public boolean adminUpdateUserById(int id, String fullName, String phone, String role, String status, String passwordHash) {
+        // update động: field nào null thì giữ nguyên
+        String sql = "  UPDATE Users\n"
+                + "        SET\n"
+                + "          full_name = COALESCE(?, full_name),\n"
+                + "          phone = COALESCE(?, phone),\n"
+                + "          role = COALESCE(?, role),\n"
+                + "          status = COALESCE(?, status),\n"
+                + "          password_hash = COALESCE(?, password_hash)\n"
+                + "        WHERE user_id = ?";
+
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+
+            ps.setNString(1, fullName);
+            ps.setNString(2, phone);
+            ps.setString(3, role);
+            ps.setString(4, status);
+            ps.setString(5, passwordHash);
+            ps.setInt(6, id);
+
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
+    }
+
+    public boolean softDeleteUser(int userId) {
+        String sql = "UPDATE Users SET status = 'INACTIVE' WHERE user_id = ?";
+        try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
+            ps.setInt(1, userId);
+            return ps.executeUpdate() > 0;
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return false;
     }
 
     // =========================
@@ -309,7 +351,7 @@ public class UsersDAO {
         return s == null || s.trim().isEmpty();
     }
 
-      public StaffOrganizerResponse getStaffAndOrganizer() {
+    public StaffOrganizerResponse getStaffAndOrganizer() {
         String sql = "SELECT user_id, full_name, email, phone, role, status, Wallet "
                 + "FROM Users "
                 + "WHERE status = ? AND role IN (?, ?)";
@@ -349,4 +391,5 @@ public class UsersDAO {
 
         return new StaffOrganizerResponse(staffList, organizerList);
     }
+
 }
