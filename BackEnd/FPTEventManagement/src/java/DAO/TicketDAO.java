@@ -543,15 +543,19 @@ public class TicketDAO {
     public List<MyTicketResponse> getTicketsByRole(String role, int userId, Integer eventId) {
         List<MyTicketResponse> list = new ArrayList<>();
 
-        // Thêm điều kiện lọc eventId vào SQL: (? IS NULL OR t.event_id = ?)
         String sql = "SELECT t.ticket_id, t.qr_code_value, er.title, er.preferred_start_time, "
-                + "t.status, t.checkin_time, t.check_out_time, t.qr_issued_at, u.full_name "
+                + "t.status, t.checkin_time, t.check_out_time, t.qr_issued_at, u.full_name, "
+                + "s.seat_code, esl.seat_type "
                 + "FROM [dbo].[Ticket] t "
                 + "JOIN [dbo].[Event_Request] er ON t.event_id = er.created_event_id "
                 + "JOIN [dbo].[Users] u ON t.user_id = u.user_id "
+                + "LEFT JOIN [dbo].[Event_Seat_Layout] esl "
+                + "   ON esl.event_id = t.event_id AND esl.seat_id = t.seat_id "
+                + "LEFT JOIN [dbo].[Seat] s "
+                + "   ON s.seat_id = t.seat_id "
                 + "WHERE t.status IN ('BOOKED', 'CHECKED_IN', 'CHECKED_OUT', 'REFUNDED') "
                 + "AND (? = 'ADMIN' OR (? = 'ORGANIZER' AND er.requester_id = ?)) "
-                + "AND (? IS NULL OR t.event_id = ?) " // <-- THÊM DÒNG NÀY
+                + "AND (? IS NULL OR t.event_id = ?) "
                 + "ORDER BY t.qr_issued_at DESC";
 
         try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -560,7 +564,6 @@ public class TicketDAO {
             ps.setString(2, role);
             ps.setInt(3, userId);
 
-            // Xử lý tham số eventId (nếu null thì SQL lấy hết, nếu có thì lọc đúng ID đó)
             if (eventId != null) {
                 ps.setInt(4, eventId);
                 ps.setInt(5, eventId);
@@ -581,9 +584,15 @@ public class TicketDAO {
                     item.setCheckOutTime(rs.getTimestamp("check_out_time"));
                     item.setPurchaseDate(rs.getTimestamp("qr_issued_at"));
                     item.setBuyerName(rs.getString("full_name"));
+
+                    // UPDATED:
+                    item.setSeatCode(rs.getString("seat_code"));   // từ Seat
+                    item.setCategory(rs.getString("seat_type"));   // từ Event_Seat_Layout
+
                     list.add(item);
                 }
             }
+
         } catch (Exception e) {
             System.out.println("Lỗi tại TicketDAO.getTicketsByRole: " + e.getMessage());
             e.printStackTrace();

@@ -1519,9 +1519,9 @@ public class SwaggerConfigServlet extends HttpServlet {
                 + "\"status\":{\"type\":\"string\", \"enum\":[\"BOOKED\",\"CHECKED_IN\",\"CHECKED_OUT\",\"REFUNDED\"]}," // Thêm REFUNDED
                 + "\"checkInTime\":{\"type\":\"string\",\"format\":\"date-time\"},"
                 + "\"checkOutTime\":{\"type\":\"string\",\"format\":\"date-time\"},"
-                + "\"category\":{\"type\":\"string\"},"
+             + "\"category\":{\"type\":\"string\",\"description\":\"Seat type (từ Event_Seat_Layout.seat_type theo (event_id, seat_id))\"},"
                 + "\"categoryPrice\":{\"type\":\"number\"},"
-                + "\"seatCode\":{\"type\":\"string\"},"
+                + "\"seatCode\":{\"type\":\"string\",\"description\":\"Seat ID / Seat code (từ Ticket.seat_id)\"},"
                 + "\"buyerName\":{\"type\":\"string\"},"
                 + "\"purchaseDate\":{\"type\":\"string\",\"format\":\"date-time\"}"
                 + "}},"
