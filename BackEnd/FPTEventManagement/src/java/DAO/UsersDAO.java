@@ -354,7 +354,7 @@ public class UsersDAO {
     public StaffOrganizerResponse getStaffAndOrganizer() {
         String sql = "SELECT user_id, full_name, email, phone, role, status, Wallet "
                 + "FROM Users "
-                + "WHERE status = ? AND role IN (?, ?)";
+                + "WHERE status IN (?, ?) AND role IN (?, ?)";
 
         List<Users> staffList = new ArrayList<>();
         List<Users> organizerList = new ArrayList<>();
@@ -362,8 +362,9 @@ public class UsersDAO {
         try ( Connection conn = DBUtils.getConnection();  PreparedStatement ps = conn.prepareStatement(sql)) {
 
             ps.setString(1, "ACTIVE");
-            ps.setString(2, "STAFF");
-            ps.setString(3, "ORGANIZER");
+            ps.setString(2, "INACTIVE");
+            ps.setString(3, "STAFF");
+            ps.setString(4, "ORGANIZER");
 
             try ( ResultSet rs = ps.executeQuery()) {
                 while (rs.next()) {
@@ -375,7 +376,6 @@ public class UsersDAO {
                     u.setRole(rs.getString("role"));
                     u.setStatus(rs.getString("status"));
                     u.setWallet(rs.getBigDecimal("Wallet"));
-                    // ❌ KHÔNG set createdAt
 
                     if ("STAFF".equalsIgnoreCase(u.getRole())) {
                         staffList.add(u);
