@@ -543,6 +543,40 @@ public class TicketDAO {
     public List<MyTicketResponse> getTicketsByRole(String role, int userId, Integer eventId) {
         List<MyTicketResponse> list = new ArrayList<>();
 
+        /**
+         * ================================================================================================
+         * METHOD: getTicketsByRole - LẤY DANH SÁCH VÉ THEO ROLE (ADMIN / ORGANIZER)
+         * ================================================================================================
+         *
+         * MỤC ĐÍCH:
+         * - Trả về danh sách vé dựa trên vai trò người gọi:
+         *   + 'ADMIN' => xem tất cả vé
+         *   + 'ORGANIZER' => xem vé chỉ cho các event do organizer tạo (er.requester_id = userId)
+         * - Hỗ trợ lọc theo eventId (nếu param eventId != null)
+         *
+         * THAM SÁO:
+         * - role: 'ADMIN' | 'ORGANIZER' (kiểm tra được từ Jwt)
+         * - userId: id của user yêu cầu (dùng để so sánh với er.requester_id khi role = ORGANIZER)
+         * - eventId: optional, nếu khác null thì lọc theo event
+         *
+         * TRẢ VỀ:
+         * - List<MyTicketResponse> chứa thông tin vé + buyer name + seat code + seat type + event info
+         *
+         * SQL / BUSINESS LOGIC:
+         * - JOIN [Event_Request] (er) để kiểm tra quyền organizer, JOIN [Users] để lấy buyer name,
+         *   LEFT JOIN [Event_Seat_Layout] + [Seat] để lấy seat_code và seat_type.
+         * - WHERE có biểu thức (? = 'ADMIN' OR (? = 'ORGANIZER' AND er.requester_id = ?))
+         *   để áp dụng quyền kiểm soát trên query thay vì filter sau khi query.
+         * - Lọc chỉ các status hợp lệ (BOOKED, CHECKED_IN, CHECKED_OUT, REFUNDED).
+         * - Sắp xếp theo t.qr_issued_at DESC để vé mới nhất lên trước.
+         *
+         * LƯU Ý BẢO MẬT & HIỆU NĂNG:
+         * - Sử dụng PreparedStatement để tránh SQL injection.
+         * - Nếu dữ liệu lớn, cần cân nhắc phân trang (LIMIT/OFFSET) và chỉ lấy fields cần thiết.
+         *
+         * SỬ DỤNG:
+         * - TicketListController, Admin dashboard, Organizer event management
+         */
         String sql = "SELECT t.ticket_id, t.qr_code_value, er.title, er.preferred_start_time, "
                 + "t.status, t.checkin_time, t.check_out_time, t.qr_issued_at, u.full_name, "
                 + "s.seat_code, esl.seat_type "
@@ -641,6 +675,25 @@ public class TicketDAO {
         return list;
     }
 
+    /**
+     * ================================================================================================
+     * METHOD: findTicketsByIds - LẤY NHIỀU VÉ THEO DANH SÁCH ID
+     * ================================================================================================
+     *
+     * MỤC ĐÍCH:
+     * - Truy vấn nhiều ticket theo danh sách ticket_id truyền vào (dùng cho batch)
+     *
+     * THAM SỐ:
+     * - ids: danh sách ticket_id cần lấy
+     *
+     * TRẢ VỀ:
+     * - List<Ticket>: danh sách Ticket (có thể rỗng nếu không tìm thấy)
+     *
+     * LƯU Ý:
+     * - Nếu ids rỗng hoặc null sẽ trả về danh sách rỗng ngay lập tức.
+     * - Sử dụng PreparedStatement với placeholders để tránh SQL injection.
+     */
+
     public void updateTicketAfterPayment(Ticket t) throws SQLException, ClassNotFoundException {
         String sql = "UPDATE Ticket SET "
                 + "bill_id = ?, "
@@ -664,6 +717,24 @@ public class TicketDAO {
         }
     }
 
+    /**
+     * ================================================================================================
+     * METHOD: updateTicketAfterPayment - CẬP NHẬT VÉ SAU KHI THANH TOÁN
+     * ================================================================================================
+     *
+     * MỤC ĐÍCH:
+     * - Cập nhật thông tin liên quan đến thanh toán trên bảng Ticket (bill_id, status, qr_issued_at)
+     *
+     * THAM SỐ:
+     * - t: Ticket chứa ticketId và các field cần cập nhật (billId, status, qrIssuedAt)
+     *
+     * TRẢ VỀ:
+     * - void; ném SQLException nếu có lỗi
+     *
+     * LƯU Ý:
+     * - Dùng sau khi thanh toán thành công để liên kết bill và thay đổi trạng thái vé.
+     */
+
     public void deleteTicketsByIds(List<Integer> ids) throws SQLException, ClassNotFoundException {
         if (ids == null || ids.isEmpty()) {
             return;
@@ -683,6 +754,22 @@ public class TicketDAO {
         }
     }
 
+    /**
+     * ================================================================================================
+     * METHOD: deleteTicketsByIds - XÓA NHIỀU VÉ THEO DANH SÁCH ID
+     * ================================================================================================
+     *
+     * MỤC ĐÍCH:
+     * - Xóa nhiều record trong bảng Ticket theo danh sách ticket_id (batch delete)
+     *
+     * THAM SỐ:
+     * - ids: danh sách ticket_id cần xóa
+     *
+     * LƯU Ý:
+     * - Nếu danh sách rỗng sẽ không thực hiện gì.
+     * - Hành vi xóa là vĩnh viễn; nếu cần soft-delete, chuyển sang cập nhật cột trạng thái.
+     */
+
     public boolean checkoutTicket(int ticketId) {
         String sql = "UPDATE dbo.Ticket "
                 + "SET status = 'CHECKED_OUT', check_out_time = GETDATE() "
@@ -698,6 +785,21 @@ public class TicketDAO {
             return false;
         }
     }
+
+    /**
+     * ================================================================================================
+     * METHOD: checkoutTicket - CHECK-OUT VÉ (KHI NGƯỜI DÙNG RỜI SỰ KIỆN)
+     * ================================================================================================
+     *
+     * MỤC ĐÍCH:
+     * - Đánh dấu vé đã CHECKED_OUT và ghi thời gian check_out_time
+     *
+     * THAM SỐ:
+     * - ticketId: ID của vé cần checkout
+     *
+     * TRẢ VỀ:
+     * - boolean: true nếu update thành công (vét đang ở trạng thái CHECKED_IN), false nếu thất bại
+     */
 
 // DAO/TicketDAO.java (thêm overload dùng Connection)
     public int insertTicketAndReturnId(Connection conn, Ticket t) throws SQLException {
@@ -759,6 +861,26 @@ public class TicketDAO {
         }
     }
 
+    /**
+     * ================================================================================================
+     * METHOD: insertTicketAndReturnId (overload) - TẠO VÉ TRONG TRANSACTION
+     * ================================================================================================
+     *
+     * MỤC ĐÍCH:
+     * - Phiên bản overload cho phép caller truyền Connection (sử dụng trong transaction)
+     * - Trả về ticket_id sinh bởi database
+     *
+     * THAM SỐ:
+     * - conn: Connection do caller quản lý (không đóng trong hàm)
+     * - t: Ticket object
+     *
+     * TRẢ VỀ:
+     * - ticket_id (>0) nếu insert thành công, -1 nếu thất bại
+     *
+     * LƯU Ý:
+     * - Caller chịu trách nhiệm commit/rollback và đóng Connection.
+     */
+
     public void updateTicketAfterPayment(Connection conn, Ticket t) throws SQLException {
         String sql = "UPDATE Ticket SET bill_id=?, status=?, qr_issued_at=? WHERE ticket_id=?";
         try ( PreparedStatement ps = conn.prepareStatement(sql)) {
@@ -769,6 +891,22 @@ public class TicketDAO {
             ps.executeUpdate();
         }
     }
+
+    /**
+     * ================================================================================================
+     * METHOD: updateTicketAfterPayment (overload with Connection) - CẬP NHẬT TRONG TRANSACTION
+     * ================================================================================================
+     *
+     * MỤC ĐÍCH:
+     * - Tương tự updateTicketAfterPayment nhưng dùng Connection do caller truyền vào (dùng trong transaction)
+     *
+     * THAM SỐ:
+     * - conn: Connection do caller quản lý
+     * - t: Ticket chứa thông tin cập nhật
+     *
+     * LƯU Ý:
+     * - Không commit/rollback trong hàm này; caller chịu trách nhiệm quản lý transaction.
+     */
 
     public void deleteTicketsByIds(Connection conn, List<Integer> ids) throws SQLException {
         if (ids == null || ids.isEmpty()) {
@@ -783,5 +921,21 @@ public class TicketDAO {
             ps.executeUpdate();
         }
     }
+
+    /**
+     * ================================================================================================
+     * METHOD: deleteTicketsByIds (overload with Connection) - XÓA NHIỀU VÉ TRONG TRANSACTION
+     * ================================================================================================
+     *
+     * MỤC ĐÍCH:
+     * - Xóa nhiều ticket sử dụng Connection do caller truyền (thuận tiện khi chạy batch trong transaction)
+     *
+     * THAM SỐ:
+     * - conn: Connection do caller quản lý
+     * - ids: danh sách ticket_id cần xóa
+     *
+     * LƯU Ý:
+     * - Caller chịu trách nhiệm commit/rollback.
+     */
 
 }
